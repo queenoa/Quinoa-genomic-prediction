@@ -59,7 +59,6 @@ All models use the same fold assignments, seeds, preprocessing (z-score standard
 │   │   ├── BayesC_CV2_single_iter.R # CV2 (one iteration per SLURM job)
 │   │   ├── BayesC_CV0.R             # CV0 (deterministic)
 │   │   ├── BayesC_CrossLoc.R        # Cross-location prediction
-│   │   ├── BayesC_full_model.R      # Full model diagnostics + marker effects
 │   │   ├── launch_BayesC_jobs.sh    # SLURM job generation/submission
 │   │   └── aggregate_BayesC_results.R
 │   │
@@ -142,7 +141,6 @@ Bayesian SNP regression via BGLR with a spike-and-slab prior:
 - **Fixed**: location + year-within-location (as fixed effects, since BGLR lacks random effects)
 - **Marker effects**: BayesC prior (some markers shrunk to zero)
 - MCMC: 15,000 iterations, 5,000 burn-in, thinning every 5
-- Full model mode provides variance components, Manhattan plots, and MCMC diagnostics
 - Distributed via SLURM (one job per trait per iteration for CV1/CV2)
 
 ### RKHS
@@ -218,7 +216,6 @@ This removes environmental mean differences so that prediction accuracy reflects
 All predictions are evaluated **per location-year** using:
 
 - **Pearson correlation** — linear predictive accuracy
-- **Spearman rank correlation** — rank-based predictive accuracy
 - **NDCG@10** — normalised discounted cumulative gain at top 10, reflecting selection ranking quality at ~20% selection intensity
 
 Trait directionality is accounted for (e.g., for DTF, lower values are ranked higher in NDCG).
