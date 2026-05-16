@@ -108,7 +108,7 @@ Mixed model using ASReml-R with a pre-computed genomic relationship matrix. Two 
 - **Global model** (pooled across both locations) — `fixed = ~ location`, `random = vm(sample.id, G) + at(location):year` (location-specific year variance components), `residual = dsum(~ units | location)` (heterogeneous residual variance per location). Used for CV1, CV2, CV0. The CrossLoc variant uses an intercept-only fixed effect with `~ units` residual since `dsum`/`at(location)` collapse to homogeneous within a single location.
 - **Per-location model** — fit independently within each location: `fixed = ~ 1`, `random = vm(sample.id, G) + year`, `residual = ~ units`. Used to benchmark within-location vs. global prediction accuracy and to estimate location-specific genetic variance components. Heterogeneous residual variances across years are not modelled at the per-location scale due to convergence failures (2–3 years per location, no within-year replication, year already random).
 
-Runs locally (no SLURM). See `models/GBLUP/README.md`.
+Runs locally (no SLURM). See [models/GBLUP/README.md](models/GBLUP/README.md).
 
 ### BayesC
 
@@ -119,7 +119,7 @@ Bayesian SNP regression via BGLR with a spike-and-slab prior:
 - MCMC: 15,000 iterations, 5,000 burn-in, thinning every 5
 - Distributed via SLURM (one job per trait per iteration for CV1/CV2)
 
-See `models/BayesC/README.md`.
+See [models/BayesC/README.md](models/BayesC/README.md).
 
 ### RKHS
 
@@ -131,7 +131,7 @@ Reproducing Kernel Hilbert Space regression via BGLR with Gaussian kernel averag
 - Non-parametric: predicts through genomic similarity, not individual marker effects
 - Distributed via SLURM (one job per trait)
 
-See `models/RKHS/README.md`.
+See [models/RKHS/README.md](models/RKHS/README.md).
 
 ### LightGBM
 
@@ -141,7 +141,7 @@ Gradient boosting on the kinship matrix:
 - **Hyperparameters**: tuned per trait via `RandomizedSearchCV` (50 combinations, 5-fold GroupKFold)
 - Runs locally (no SLURM)
 
-See `models/LightGBM/README.md`.
+See [models/LightGBM/README.md](models/LightGBM/README.md).
 
 ## Preprocessing
 
@@ -278,7 +278,7 @@ conda activate ../LightGBM/env-ML
 pytest . -v
 ```
 
-Tests cover fold assignment consistency, evaluation metrics, data loading, per-location-year evaluation, and end-to-end CV pipeline integration. See `models/tests/README.md` for the inventory.
+Tests cover fold assignment consistency, evaluation metrics, data loading, per-location-year evaluation, and end-to-end CV pipeline integration. See [models/tests/README.md](models/tests/README.md).
 
 ## Requirements
 
