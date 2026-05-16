@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "RKHS_utils.R"))
+  source(file.path("..", "RKHS", "RKHS_utils.R"))
 )
 
 # ── Helper: make a small genotype-level kernel ────────────────────────────────

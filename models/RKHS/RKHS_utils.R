@@ -37,10 +37,10 @@ library(data.table)
 
 # ── Global constants ─────────────────────────────────────────────────────────
 
-VALID_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue', 'PcleLng_blue',
-                  'SdLen_blue', 'TGW_blue', 'SdW_z_blue')
+VALID_TRAITS <- c('DTF', 'DTH', 'PtHt', 'PcleLng',
+                  'SdLen', 'TGW', 'SdW_z')
 
-LOWER_IS_BETTER_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
+LOWER_IS_BETTER_TRAITS <- c('DTF', 'DTH', 'PtHt')
 
 # ============================================================================
 # DATA LOADING, KERNEL COMPUTATION, AND PREPROCESSING
@@ -64,7 +64,7 @@ LOWER_IS_BETTER_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
 #' @return List with components: pheno, K_geno_list, h_values, med_D
 
 load_and_prepare_data <- function(trait, marker_file,
-                                   pheno_file = "AUSPAK_phenotypes_means_BLUEs.csv",
+                                   pheno_file = "../AUSPAK_phenotypes_GP_input.csv",
                                    kernel_checkpoint = "RKHS_kernels.RData") {
 
   # ── Validate inputs ──────────────────────────────────────────────────────

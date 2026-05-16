@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "BayesC_utils.R"))
+  source(file.path("..", "BayesC", "BayesC_utils.R"))
 )
 
 test_that("returns correct Pearson and Spearman for perfect correlation", {
@@ -50,8 +50,8 @@ test_that("lower_is_better trait changes NDCG value for imperfect predictions", 
   y_true <- c(1, 3, 2, 5, 4)
   y_pred <- c(2, 5, 1, 4, 3)  # imperfect prediction
 
-  res_lower <- evaluate_predictions(y_true, y_pred, trait_name = "DTF_blue")
-  res_higher <- evaluate_predictions(y_true, y_pred, trait_name = "TGW_blue")
+  res_lower <- evaluate_predictions(y_true, y_pred, trait_name = "DTF")
+  res_higher <- evaluate_predictions(y_true, y_pred, trait_name = "TGW")
 
   # Pearson/Spearman are unaffected by the sign flip
   expect_equal(res_lower$pearson, res_higher$pearson)
@@ -73,7 +73,7 @@ test_that("all LOWER_IS_BETTER_TRAITS are recognised", {
 
   expected <- calculate_ndcg(y_true, y_pred, k = 10, lower_is_better = TRUE)
 
-  for (trait in c("DTF_blue", "DTH_blue", "PtHt_blue")) {
+  for (trait in c("DTF", "DTH", "PtHt")) {
     res <- evaluate_predictions(y_true, y_pred, trait_name = trait)
     expect_equal(res$ndcg_at_10, expected, label = paste("NDCG for", trait))
   }
@@ -84,7 +84,7 @@ test_that("non-lower_is_better traits don't flip NDCG", {
   y_true <- c(5, 4, 3, 2, 1)
   y_pred <- c(5, 4, 3, 2, 1)
 
-  for (trait in c("TGW_blue", "SdLen_blue", "PcleLng_blue", "SdW_z_blue")) {
+  for (trait in c("TGW", "SdLen", "PcleLng", "SdW_z")) {
     res <- evaluate_predictions(y_true, y_pred, trait_name = trait)
     expect_equal(res$ndcg_at_10, 1.0, label = paste("NDCG for", trait))
   }

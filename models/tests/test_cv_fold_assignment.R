@@ -24,7 +24,7 @@ build_test_pheno <- function(n_genotypes = 100, seed = 42) {
         location       = parts[1],
         year           = parts[2],
         location_year  = ly,
-        trait_blue     = rnorm(1),
+        trait_val     = rnorm(1),
         stringsAsFactors = FALSE
       )))
     }
@@ -143,7 +143,7 @@ test_that("CV1 folds shuffle across many iterations (not just 2)", {
 test_that("CV2 folds differ across iterations (shuffling works)", {
   pheno              <- build_test_pheno()
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
 
   assign_cv2_folds <- function(seed) {
@@ -166,7 +166,7 @@ test_that("CV2 folds differ across iterations (shuffling works)", {
 test_that("CV2 same seed produces identical fold assignments (reproducible)", {
   pheno              <- build_test_pheno()
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
 
   assign_cv2_folds <- function(seed) {
@@ -185,7 +185,7 @@ test_that("CV2 same seed produces identical fold assignments (reproducible)", {
 test_that("CV2 all location-years are represented in every fold", {
   pheno              <- build_test_pheno()
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
   all_lys            <- unique(location_years_obs)
 
@@ -209,7 +209,7 @@ test_that("CV2 all location-years are represented in every fold", {
 test_that("CV2 folds are balanced within each location-year", {
   pheno              <- build_test_pheno()
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
 
   set.seed(2001)
@@ -235,11 +235,11 @@ test_that("CV2 folds are balanced within each location-year", {
 test_that("CV2 unobserved rows remain unassigned (fold = 0)", {
   pheno <- build_test_pheno()
   # Inject some NAs
-  pheno$trait_blue[sample(nrow(pheno), 20)] <- NA
+  pheno$trait_val[sample(nrow(pheno), 20)] <- NA
 
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
-  unobserved_idx     <- which(is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
+  unobserved_idx     <- which(is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
 
   set.seed(2001)
@@ -258,7 +258,7 @@ test_that("CV2 unobserved rows remain unassigned (fold = 0)", {
 test_that("CV2 folds shuffle across many iterations (not just 2)", {
   pheno              <- build_test_pheno()
   k_folds            <- 5
-  observed_idx       <- which(!is.na(pheno$trait_blue))
+  observed_idx       <- which(!is.na(pheno$trait_val))
   location_years_obs <- pheno$location_year[observed_idx]
 
   fingerprints <- character(5)

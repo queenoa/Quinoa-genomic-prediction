@@ -28,10 +28,9 @@ from LightGBM_utils import (
 def get_feature_columns(data, include_location=True, include_location_year=True):
     """Get feature column names based on what should be included.
 
-    Genetic features are detected by prefix: 'PC' for principal components,
-    'K_' for kinship matrix columns. The two are mutually exclusive per dataset.
+    Genetic features are kinship matrix columns (prefix 'K_').
     """
-    cols = [c for c in data.columns if c.startswith('PC') or c.startswith('K_')]
+    cols = [c for c in data.columns if c.startswith('K_')]
     if include_location:
         cols += [c for c in data.columns if c.startswith('location_') and
                  not c.startswith('location_year')]
@@ -64,7 +63,7 @@ def run_cv1(data, traits, model_class=LGBMRegressor, model_params=None,
           f"{len(data)} observations")
     print(f"Settings: {k_folds} folds, {n_iterations} iterations, "
           f"min genotypes per location-year: {min_genotypes}")
-    print(f"Features: {len(feature_columns)} (PCs + encoded variables)\n")
+    print(f"Features: {len(feature_columns)} (kinship + encoded variables)\n")
 
     cv_results = []
     cv_predictions = []
@@ -174,7 +173,7 @@ def run_cv2(data, traits, model_class=LGBMRegressor, model_params=None,
           f"{len(data)} observations")
     print(f"Settings: {k_folds} folds, {n_iterations} iterations, "
           f"min genotypes per location-year: {min_genotypes}")
-    print(f"Features: {len(feature_columns)} (PCs + encoded variables)\n")
+    print(f"Features: {len(feature_columns)} (kinship + encoded variables)\n")
 
     cv_results = []
     cv_predictions = []
@@ -285,7 +284,7 @@ def run_cv0(data, traits, model_class=LGBMRegressor, model_params=None,
           f"{len(location_years)} location-years, "
           f"{len(data)} observations")
     print(f"Min genotypes: {min_genotypes}")
-    print(f"Features: {len(feature_columns)} (PCs + encoded variables)\n")
+    print(f"Features: {len(feature_columns)} (kinship + encoded variables)\n")
 
     cv_results = []
     cv_predictions = []
@@ -366,8 +365,9 @@ def run_cv0(data, traits, model_class=LGBMRegressor, model_params=None,
 # ============================================================================
 # Cross-location transferability
 # Train on one location only, predict all other locations.
-# Uses PC features only (no location/location_year encoding) — prediction
-# comes purely from genetic features, matching GBLUP's trait ~ 1 + G approach.
+# Uses kinship features only (no location/location_year encoding) —
+# prediction comes purely from genetic relationships, matching GBLUP's
+# trait ~ 1 + G approach.
 # ============================================================================
 
 def run_cross_location(data, traits, model_class=LGBMRegressor, model_params=None,
@@ -381,16 +381,16 @@ def run_cross_location(data, traits, model_class=LGBMRegressor, model_params=Non
     if model_params is None:
         model_params = DEFAULT_PARAMS
 
-    # PCs only — no location/location_year encoding
-    pc_columns = get_feature_columns(data, include_location=False,
-                                      include_location_year=False)
+    # Kinship only — no location/location_year encoding
+    genetic_columns = get_feature_columns(data, include_location=False,
+                                           include_location_year=False)
     locations = data['location'].unique()
 
     print(f"Data: {data['sample.id'].nunique()} genotypes, "
           f"{data['location_year'].nunique()} location-years, "
           f"{len(data)} observations")
     print(f"Locations: {', '.join(locations)}")
-    print(f"Features: {len(pc_columns)} (PCs only)")
+    print(f"Features: {len(genetic_columns)} (kinship only)")
     print(f"Min genotypes: {min_genotypes}\n")
 
     cv_results = []
@@ -411,7 +411,7 @@ def run_cross_location(data, traits, model_class=LGBMRegressor, model_params=Non
                     continue
 
                 # Train model on source location only
-                X_train = train_data[pc_columns]
+                X_train = train_data[genetic_columns]
                 y_train = train_data[trait]
                 params = fetch_model_params(model_params, trait)
                 model = model_class(random_state=42, verbosity=-1, **params)
@@ -432,7 +432,7 @@ def run_cross_location(data, traits, model_class=LGBMRegressor, model_params=Non
                         continue
 
                     # Predict
-                    X_test = ly_data[pc_columns]
+                    X_test = ly_data[genetic_columns]
                     ly_data['predicted'] = model.predict(X_test)
 
                     # Average by genotype

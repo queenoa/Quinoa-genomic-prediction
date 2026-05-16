@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-# Add parent directory to path so we can import the pipeline modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# LightGBM pipeline scripts live in ../LightGBM/ relative to this file
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'LightGBM'))
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -24,45 +24,29 @@ def rng():
 @pytest.fixture
 def pheno_subset():
     """Real phenotype subset — 100 genotypes, 6 location-years."""
-    return pd.read_csv(os.path.join(FIXTURE_DIR, 'pheno_subset.csv'),
-                       index_col=0)
-
-
-@pytest.fixture
-def pca_subset():
-    """Real PCA subset — 100 genotypes, 551 PCs."""
-    return pd.read_csv(os.path.join(FIXTURE_DIR, 'pca_subset.csv'))
+    return pd.read_csv(os.path.join(FIXTURE_DIR, 'pheno_subset.csv'))
 
 
 @pytest.fixture
 def kinship_subset():
-    """Real kinship subset — 100 × 100."""
+    """Real kinship subset — 100 x 100."""
     return pd.read_csv(os.path.join(FIXTURE_DIR, 'kinship_subset.csv'),
                        index_col=0)
 
 
 @pytest.fixture
-def model_input_pc(pheno_subset, pca_subset):
-    """Prepared model input with all PCs and one-hot encoding.
-
-    Mirrors the output of Prepare_input_data.py for the all-PC approach.
-    """
-    from Prepare_input_data import one_hot_encode
-
-    merged = pd.merge(pca_subset, pheno_subset.reset_index(), on='sample.id')
-    return one_hot_encode(merged)
-
-
-@pytest.fixture
 def model_input_kinship(pheno_subset, kinship_subset):
-    """Prepared model input with kinship features and one-hot encoding."""
+    """Prepared model input with kinship features and one-hot encoding.
+
+    Mirrors the output of Prepare_input_data.py (kinship-only pipeline).
+    """
     from Prepare_input_data import one_hot_encode
 
     kinship_subset.index.name = 'sample.id'
     kin_df = kinship_subset.reset_index()
     kin_df.columns = ['sample.id'] + [f'K_{c}' for c in kinship_subset.columns]
 
-    merged = pd.merge(kin_df, pheno_subset.reset_index(), on='sample.id')
+    merged = pd.merge(kin_df, pheno_subset, on='sample.id')
     return one_hot_encode(merged)
 
 

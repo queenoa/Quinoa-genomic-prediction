@@ -30,7 +30,7 @@
 #   Rscript aggregate_BayesC_results.R all
 ################################################################################
 
-# ── SLURM parameters (EDIT THESE) ────────────────────────────────────────────
+# ── SLURM parameters  ────────────────────────────────────────────
 
 # CV1 and CV2 per-iteration jobs (both loop over 5 folds)
 PARTITION="batch"
@@ -45,9 +45,9 @@ TIME_FULLMODEL="200:00:00"  # single fit on all data
 MEM_DETERM="80G"
 
 ACCOUNT=""                   # leave empty if not needed
-MAIL=""  
+MAIL="stansccs@kaust.edu.sa"  
 
-# ── Paths (EDIT THESE) ───────────────────────────────────────────────────────
+# ── Paths  ───────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK_DIR="${SCRIPT_DIR}"     # where phenotype + genotype + R scripts live
@@ -55,7 +55,7 @@ MARKER_FILE="pruned05_AUSPAK_for_bayesC.raw"
 
 # ── Traits and iterations ────────────────────────────────────────────────────
 
-TRAITS=("DTF_blue" "DTH_blue" "PtHt_blue" "PcleLng_blue" "SdLen_blue" "TGW_blue" "SdW_z_blue")
+TRAITS=("DTF" "DTH" "PtHt" "PcleLng" "SdLen" "TGW" "SdW_z")
 N_ITERATIONS=15
 
 # ── Parse arguments ──────────────────────────────────────────────────────────

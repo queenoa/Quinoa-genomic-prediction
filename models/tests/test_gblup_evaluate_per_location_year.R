@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "GBLUP", "GBLUP_utils.R"))
+  source(file.path("..", "GBLUP", "GBLUP_utils.R"))
 )
 
 # ============================================================================
@@ -27,7 +27,7 @@ make_test_data <- function(n_per_ly = 20, n_ly = 3, seed = 42) {
     sample.id     = rep(geno_ids, times = n_ly),
     location_year = rep(ly_names, each = n_per_ly),
     location      = rep(loc_names, each = n_per_ly),
-    DTF_blue      = rnorm(n),
+    DTF      = rnorm(n),
     stringsAsFactors = FALSE
   )
 
@@ -35,7 +35,7 @@ make_test_data <- function(n_per_ly = 20, n_ly = 3, seed = 42) {
   pred_values <- data.frame(
     sample.id       = rep(geno_ids, times = n_ly),
     location_year   = rep(ly_names, each = n_per_ly),
-    predicted.value = observed_data$DTF_blue + rnorm(n, sd = 0.5),
+    predicted.value = observed_data$DTF + rnorm(n, sd = 0.5),
     stringsAsFactors = FALSE
   )
 
@@ -53,7 +53,7 @@ test_that("returns list with metrics and predictions", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -70,7 +70,7 @@ test_that("metrics has expected columns", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -86,7 +86,7 @@ test_that("evaluates all location-years with sufficient data", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -100,7 +100,7 @@ test_that("predictions has expected columns", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -120,7 +120,7 @@ test_that("only test_ids are included in results", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = test_subset,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -137,7 +137,7 @@ test_that("join matches correctly on sample.id AND location_year", {
     sample.id     = c("G1", "G1", "G2", "G2"),
     location_year = c("AUS_2019", "PAK_2020", "AUS_2019", "PAK_2020"),
     location      = c("AUS", "PAK", "AUS", "PAK"),
-    DTF_blue      = c(1.0, 2.0, 3.0, 4.0),
+    DTF      = c(1.0, 2.0, 3.0, 4.0),
     stringsAsFactors = FALSE
   )
 
@@ -150,7 +150,7 @@ test_that("join matches correctly on sample.id AND location_year", {
 
   result <- evaluate_per_location_year(
     observed_data, pred_values,
-    test_ids = c("G1", "G2"), trait = "DTF_blue", min_genotypes = 2
+    test_ids = c("G1", "G2"), trait = "DTF", min_genotypes = 2
   )
 
   preds <- result$predictions
@@ -177,7 +177,7 @@ test_that("min_genotypes filter skips small location-years", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 10  # Higher than available
   )
 
@@ -190,7 +190,7 @@ test_that("min_genotypes counts unique genotypes, not rows", {
     sample.id     = c("G1", "G1", "G2", "G3"),
     location_year = rep("AUS_2019", 4),
     location      = rep("AUS", 4),
-    DTF_blue      = c(1, 1.1, 2, 3),
+    DTF      = c(1, 1.1, 2, 3),
     stringsAsFactors = FALSE
   )
 
@@ -203,7 +203,7 @@ test_that("min_genotypes counts unique genotypes, not rows", {
 
   result <- evaluate_per_location_year(
     observed_data, pred_values,
-    test_ids = c("G1", "G2", "G3"), trait = "DTF_blue", min_genotypes = 4
+    test_ids = c("G1", "G2", "G3"), trait = "DTF", min_genotypes = 4
   )
 
   # Only 3 unique genotypes, so min_genotypes = 4 should skip
@@ -221,7 +221,7 @@ test_that("returns empty when no test IDs match predictions", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = c("NONEXISTENT1", "NONEXISTENT2"),
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
@@ -235,7 +235,7 @@ test_that("handles NA trait values in observed data (excludes them)", {
     sample.id     = paste0("G", 1:20),
     location_year = rep("AUS_2019", 20),
     location      = rep("AUS", 20),
-    DTF_blue      = c(rnorm(15), rep(NA, 5)),
+    DTF      = c(rnorm(15), rep(NA, 5)),
     stringsAsFactors = FALSE
   )
 
@@ -248,7 +248,7 @@ test_that("handles NA trait values in observed data (excludes them)", {
 
   result <- evaluate_per_location_year(
     observed_data, pred_values,
-    test_ids = paste0("G", 1:20), trait = "DTF_blue", min_genotypes = 5
+    test_ids = paste0("G", 1:20), trait = "DTF", min_genotypes = 5
   )
 
   # Predictions should only include non-NA observations
@@ -261,7 +261,7 @@ test_that("handles NA predicted values (excludes them from join)", {
     sample.id     = paste0("G", 1:20),
     location_year = rep("AUS_2019", 20),
     location      = rep("AUS", 20),
-    DTF_blue      = rnorm(20),
+    DTF      = rnorm(20),
     stringsAsFactors = FALSE
   )
 
@@ -274,7 +274,7 @@ test_that("handles NA predicted values (excludes them from join)", {
 
   result <- evaluate_per_location_year(
     observed_data, pred_values,
-    test_ids = paste0("G", 1:20), trait = "DTF_blue", min_genotypes = 5
+    test_ids = paste0("G", 1:20), trait = "DTF", min_genotypes = 5
   )
 
   # NA predictions should be filtered out
@@ -292,25 +292,25 @@ test_that("metrics match manual calculation", {
     sample.id     = paste0("G", 1:n),
     location_year = rep("AUS_2019", n),
     location      = rep("AUS", n),
-    DTF_blue      = rnorm(n),
+    DTF      = rnorm(n),
     stringsAsFactors = FALSE
   )
 
   pred_values <- data.frame(
     sample.id       = paste0("G", 1:n),
     location_year   = rep("AUS_2019", n),
-    predicted.value = observed_data$DTF_blue + rnorm(n, sd = 0.3),
+    predicted.value = observed_data$DTF + rnorm(n, sd = 0.3),
     stringsAsFactors = FALSE
   )
 
   result <- evaluate_per_location_year(
     observed_data, pred_values,
-    test_ids = paste0("G", 1:n), trait = "DTF_blue", min_genotypes = 5
+    test_ids = paste0("G", 1:n), trait = "DTF", min_genotypes = 5
   )
 
   # Manual calculation
-  expected_pearson <- cor(observed_data$DTF_blue, pred_values$predicted.value)
-  expected_spearman <- cor(observed_data$DTF_blue, pred_values$predicted.value,
+  expected_pearson <- cor(observed_data$DTF, pred_values$predicted.value)
+  expected_spearman <- cor(observed_data$DTF, pred_values$predicted.value,
                            method = "spearman")
 
   expect_equal(result$metrics$pearson, expected_pearson, tolerance = 1e-10)
@@ -324,11 +324,11 @@ test_that("trait column is recorded correctly in metrics", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 
-  expect_true(all(result$metrics$trait == "DTF_blue"))
+  expect_true(all(result$metrics$trait == "DTF"))
 })
 
 test_that("location is extracted correctly per location-year", {
@@ -338,7 +338,7 @@ test_that("location is extracted correctly per location-year", {
     observed_data = dat$observed,
     pred_values   = dat$predicted,
     test_ids      = dat$geno_ids,
-    trait         = "DTF_blue",
+    trait         = "DTF",
     min_genotypes = 5
   )
 

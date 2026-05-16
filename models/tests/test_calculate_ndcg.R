@@ -2,7 +2,7 @@ library(testthat)
 
 # Source the utils
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "BayesC_utils.R"))
+  source(file.path("..", "BayesC", "BayesC_utils.R"))
 )
 
 test_that("perfect ranking returns NDCG = 1", {

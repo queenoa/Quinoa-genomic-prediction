@@ -1,87 +1,92 @@
-# GBLUP Multi-Environment Genomic Prediction Pipeline
+# GBLUP Pipeline
 
-## Overview
+ASReml-R GBLUP implementation for the AUSPAK quinoa multi-environment genomic prediction comparison. See the repository [README](../../README.md) for the project overview, trait/environment definitions, CV-scheme designs, and evaluation metrics shared across all four pipelines.
 
-Genomic Best Linear Unbiased Prediction (GBLUP) pipeline for the AUSPAK **quinoa** dataset, using the [ASReml-R](https://vsni.co.uk/software/asreml-r) package. Evaluates prediction accuracy for 7 traits across multiple environments (location-years) using four cross-validation schemes.
+Two model variants are run:
 
-Unlike BayesC and RKHS (which use BGLR), GBLUP uses ASReml-R with a pre-computed genomic relationship matrix (G matrix). ASReml supports proper random effects, so location:year is fitted as a random term (shrunk toward zero) rather than approximated as fixed. The model runs significantly faster than BGLR, so all traits and CV schemes are executed in a single monolithic script on a local machine rather than distributed across SLURM jobs.
+- **Global model** — fitted on data pooled across both locations. Primary pipeline (`GBLUP.R` + `GBLUP_utils.R`). Used for all four CV schemes (CV1, CV2, CV0, CrossLoc).
+- **Per-location model** — fitted independently on each location's subset (`GBLUP_per_location_CV1.R`). Used to benchmark within-location vs. global prediction accuracy and to estimate location-specific genetic variance components.
 
-## GBLUP method
+GBLUP uses ASReml-R with a pre-computed genomic relationship matrix. Runs locally (no SLURM).
 
-### Genomic relationship matrix
+## Genomic relationship matrix
 
-The G matrix inverse (`Ginv_sparse`) is prepared by `G_matrix_GBLUP.R` using the [ASRgenomics](https://cran.r-project.org/package=ASRgenomics) package:
+The G matrix inverse (`Ginv_sparse`) is prepared by `G_matrix_GBLUP.R` using [ASRgenomics](https://cran.r-project.org/package=ASRgenomics):
 
-1. Load a pre-computed VanRaden method 1 kinship matrix (computed externally from the full marker set)
-2. **Bend** via `ASRgenomics::G.tuneup(G, bend = TRUE)` — adjusts eigenvalues to ensure the G matrix is positive definite (required for stable inversion)
-3. **Invert** via `ASRgenomics::G.inverse(Gb, sparse = TRUE)` — computes the inverse and returns it in ASReml's sparse triplet format (a 3-column matrix of row, col, value with genotype IDs stored in the `rowNames` attribute)
+1. Load a pre-computed VanRaden method 1 kinship matrix
+2. **Bend** via `ASRgenomics::G.tuneup(G, bend = TRUE)` — adjusts eigenvalues to ensure positive definiteness
+3. **Invert** via `ASRgenomics::G.inverse(Gb, sparse = TRUE)` — sparse triplet format (row, col, value) with genotype IDs in the `rowNames` attribute
 
-ASReml uses `vm(sample.id, Ginv_sparse)` to define the genomic relationship structure. Genotype factor levels are aligned to the G matrix row order via `align_genotypes_to_gmatrix()`, which reads genotype IDs from `attr(Ginv_sparse, "rowNames")`.
+ASReml uses `vm(sample.id, Ginv_sparse)` to define the genomic relationship. Genotype factor levels are aligned to G matrix row order via `align_genotypes_to_gmatrix()`, which reads genotype IDs from `attr(Ginv_sparse, "rowNames")`.
 
-### Model structure
+## Global model structure
 
-Each GBLUP fit (for CV0, CV1, CV2) includes:
+Pooled across both locations. Used for CV1 and CV2. Implemented in `fit_gblup_and_predict()` (`GBLUP_utils.R`):
 
-- **Fixed effects**: location (main effect)
-- **Random effects**: `vm(sample.id, Ginv_sparse)` (genomic BLUPs) + `location:year` (environment-specific deviations, shrunk toward zero)
-- **Residual**: `~ units` (single residual variance)
-- **Missing data**: `na.action = na.method(y = "include")` — all factor levels remain in the model even when their phenotype is NA, so ASReml can predict for held-out cells
-- **Preprocessing**: z-score standardisation of each trait within each location-year
+- **Fixed**: `trait ~ location`
+- **Random**: `vm(sample.id, Ginv_sparse) + at(location):year` — genomic BLUPs plus **location-specific year effects with separate variance components per location**
+- **Residual**: `dsum(~ units | location)` — **heterogeneous residual variance per location**
+- **Missing data**: `na.action = na.method(y = "include")` — all factor levels remain even when phenotype is NA, so ASReml predicts held-out cells
+- **Preprocessing**: z-score standardisation per location-year
+- **Data ordering**: rows are sorted by `location` inside `fit_gblup_and_predict()` (required by `dsum()`)
 
-This is the proper mixed-model equivalent of what BayesC/RKHS approximate with all-fixed location + year-within-location design matrices. In GBLUP, `location:year` is random and therefore shrunk toward zero, which is closer to the original ASReml experimental design.
+`fit_gblup_and_predict()` returns predictions and variance components (`summary(model)$varcomp`). The CV runners annotate the varcomps with per-fit metadata (`trait`, `iteration`, `fold`, `seed`, `cv_scheme`) and propagate them to `varcomps_*` CSVs.
 
-### CrossLoc model variant
+### CV0 variant
 
-For cross-location prediction, the model is simpler:
-- **Fixed effects**: intercept only (`trait ~ 1`)
-- **Random effects**: `vm(sample.id, Ginv_sparse)` only
-- No location or year effects (target location cannot contribute to estimating them)
-- Genomic BLUPs (GEBVs) are extracted via `predict(model, classify = "sample.id")` and correlated with observed phenotypes in each target location-year
+CV0 uses a separate, simpler asreml fit defined inline in `run_cv0()` (`GBLUP.R`):
 
-## Traits
+- **Fixed**: `trait ~ location`
+- **Random**: `vm(sample.id, Ginv_sparse) + location:year` — homogeneous year-within-location variance
+- **Residual**: `~ units` — **homogeneous residual variance**
 
-All input traits are BLUEs (Best Linear Unbiased Estimates):
+The heterogeneous spec (`dsum(~ units | location)` + `at(location):year`) fails for the AUS traits that have only two of three years available when the held-out location-year is removed. The homogeneous structure pools across locations and years and avoids these failures.
 
-| Code | Trait |
-|------|-------|
-| `DTF_blue` | Days to flowering |
-| `DTH_blue` | Days to maturity |
-| `PtHt_blue` | Plant height |
-| `PcleLng_blue` | Panicle length |
-| `SdLen_blue` | Seed length |
-| `TGW_blue` | Thousand grain weight |
-| `SdW_z_blue` | Seed yield |
+### CrossLoc variant
 
-Traits where lower is better (DTF, DTM, plant height) have NDCG@10 sign-flipped accordingly.
+For cross-location prediction (`run_cross_location`):
 
-## Cross-validation schemes
+- **Fixed**: intercept only (`trait ~ 1`)
+- **Random**: `vm(sample.id, Ginv_sparse)` only
+- **Residual**: `~ units` (within a single location, `dsum(~ units | location)` and `at(location):year` collapse to homogeneous)
+- GEBVs are extracted via `predict(model, classify = "sample.id")` and correlated with observed phenotypes in each target location-year. Variance components from each within-location fit are captured and saved.
 
-| Scheme | Function | What it tests |
-|--------|----------|---------------|
-| **CV1** | `run_cv1()` | Predicting **new genotypes** in known environments. 5-fold CV on genotypes, repeated across 15 iterations (seed = 1000+iter). |
-| **CV2** | `run_cv2()` | **Sparse testing** — random observation-level cells masked. 5-fold CV stratified by location-year, 15 iterations (seed = 2000+iter). |
-| **CV0** | `run_cv0()` | **Leave-one-location-year-out** — entire environments held out. Deterministic, no random folds. |
-| **CrossLoc** | `run_cross_location()` | **Cross-location transfer** — train on one location, predict all others via genomic BLUPs (GEBVs). |
+## Per-location models
 
-All four schemes match the BayesC/RKHS pipelines in design (fold assignment, seed scheme, stratification).
+Implemented in `GBLUP_per_location_CV1.R`. Fitted independently on each location's data subset. Two analyses use the same model:
 
-## Evaluation metrics
+1. **Variance-component estimation** (`fit_single_location_gblup` / `run_per_location_variances`) — fit once per `(trait, location)` on the full data, extract `genetic_variance`, `residual_variance`, and `h2 = Vg / (Vg + Ve)` from `summary(model)$varcomp`. Saved to `per_location_variances_GBLUP.csv`.
+2. **CV1 within location** (`fit_gblup_per_location` / `run_cv1_per_location`) — 5-fold CV on genotypes within each location, 15 iterations, seed = `1000 + iter`. Matches the global CV1 fold-assignment scheme. Produces per `(trait, location)` and combined-per-trait CSVs.
 
-Predictions are evaluated **per location-year** using:
+Per-location model structure (both analyses):
 
-- **Pearson correlation** — linear predictive accuracy
-- **Spearman rank correlation** — rank-based predictive accuracy
-- **NDCG@10** — normalized discounted cumulative gain at top 10, for selection ranking quality
+- **Fixed**: intercept only (`trait ~ 1`) — single location, no location effect to fit
+- **Random**: `vm(sample.id, Ginv_sparse) + year` — homogeneous year variance within the location; falls back to `vm(sample.id, Ginv_sparse)` only when the location has a single year
+- **Residual**: `~ units` (homogeneous)
+- **Preprocessing**: z-score per location-year (same as global)
 
-Each CV function returns a `predictions` dataframe with one row per test observation, recording `sample.id`, `location_year`, `location`, `observed`, and `predicted` values. These allow post-hoc recomputation of any accuracy metric.
+**Why homogeneous residuals at the per-location scale?** Heterogeneous residual variances across years (`dsum(~ units | year)`) were not modelled in the per-location models due to frequent convergence failures, given the limited number of years per location (2–3), the absence of within-year replication, and the presence of `year` as a random effect.
+
+## CV-scheme → function/script map
+
+| Scheme | Function | Script |
+|--------|----------|--------|
+| CV1 | `run_cv1()` | `GBLUP.R` |
+| CV1 per-location | `run_cv1_per_location()` | `GBLUP_per_location_CV1.R` |
+| CV2 | `run_cv2()` | `GBLUP.R` |
+| CV0 | `run_cv0()` | `GBLUP.R` |
+| CrossLoc | `run_cross_location()` | `GBLUP.R` |
+
+Fold assignment, seed scheme, and stratification match the BayesC/RKHS pipelines.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `G_matrix_GBLUP.R` | Prepares `Ginv_sparse`: loads a pre-computed VanRaden kinship matrix, bends it for positive definiteness, computes the sparse inverse, and saves to `Ginv_sparse_GBLUP.RData`. Run once before the CV pipeline. |
-| `GBLUP_utils.R` | Shared utilities: constants, z-score scaling, G matrix alignment, ASReml GBLUP fitting wrapper, evaluation metrics, summarisation |
-| `GBLUP.R` | Sources utils. Contains all four CV functions (`run_cv1`, `run_cv2`, `run_cv0`, `run_cross_location`), the `run_all_cv_schemes` wrapper, and a usage example. |
+| `G_matrix_GBLUP.R` | Prepares `Ginv_sparse_GBLUP.RData` from a pre-computed VanRaden kinship matrix (bend + sparse invert). Run once. |
+| `GBLUP_utils.R` | Shared utilities for the global pipeline: constants, z-score scaling, G-alignment, `fit_gblup_and_predict()` (heterogeneous global model used by CV1/CV2, returning predictions + varcomps), join-based per-location-year evaluation, summarisation. |
+| `GBLUP.R` | Global pipeline. All four CV functions (`run_cv1`, `run_cv2`, `run_cv0`, `run_cross_location`), the `run_all_cv_schemes` wrapper, and CSV output blocks (results, predictions, varcomps). `run_cv0` and `run_cross_location` define their asreml fits inline (homogeneous residuals); `run_cv1` and `run_cv2` go through `fit_gblup_and_predict()`. |
+| `GBLUP_per_location_CV1.R` | Per-location pipeline. Fits the within-location GBLUP per (trait, location): (a) once on full data to extract variance components → `per_location_variances_GBLUP.csv`; (b) under a 5-fold × 15-iter CV1 design → per-location CV1 CSVs. |
 
 ## Usage
 
@@ -91,59 +96,57 @@ cd models/GBLUP
 # Step 1: Prepare Ginv (run once)
 Rscript G_matrix_GBLUP.R
 
-# Step 2: Run the CV pipeline (redirect output to log file)
+# Step 2: Global CV pipeline (all four schemes)
 Rscript GBLUP.R > GBLUP_run.out 2>&1
+
+# Step 3: Per-location CV1 + per-location variance components
+Rscript GBLUP_per_location_CV1.R > GBLUP_per_location_run.out 2>&1
 ```
 
-# Results and predictions are returned in the list:
-#   all_cv$cv1$results       — CV1 accuracy metrics
-#   all_cv$cv1$predictions   — CV1 individual predictions
-#   all_cv$cv1$summary       — CV1 summary statistics
-#   all_cv$all_results       — combined results across all schemes
-```
+In-memory return from `run_all_cv_schemes(...)` (the global pipeline):
 
-## Input data
+- `$cv1$results / $predictions / $varcomps / $summary` — and likewise `$cv2`, `$cv0`, `$cross_loc`
+- `$all_results` — combined results across all four schemes
 
-### Environments
+## Input files
 
-- **Locations (2):** `AUS` (Kununurra, Australia), `PAK` (Faisalabad, Pakistan)
-- **Location-years (6):** `AUS_2017`, `AUS_2018`, `AUS_2019`, `PAK_2019`, `PAK_2020`, `PAK_2021`
-- Not all genotypes appear in all location-years; not all traits are observed for every genotype × location-year combination (NAs present)
+- **Phenotype file**: `../../data/AUSPAK_phenotypes_GP_input.csv` — columns `sample.id`, `location`, `year`, `location_year`, plus one column per trait (per-location means)
+- **Kinship matrix**: VanRaden method 1 (loaded by `G_matrix_GBLUP.R` from an external RData file)
+- **G-inverse matrix**: `Ginv_sparse_GBLUP.RData` — ASRgenomics sparse triplet format with genotype IDs in the `rowNames` attribute; produced by `G_matrix_GBLUP.R`
 
-### Raw data files
+## Output files
 
-- **Phenotype file**: data frame with columns `sample.id`, `location`, `year`, `location_year`, and the trait columns
-- **Kinship matrix**: VanRaden method 1 kinship matrix (loaded by `G_matrix_GBLUP.R` from an external RData file)
-- **G-inverse matrix**: `Ginv_sparse` — ASRgenomics sparse triplet format (3-column matrix of row, col, value) with genotype IDs in the `rowNames` attribute. Produced by `G_matrix_GBLUP.R` and saved to `Ginv_sparse_GBLUP.RData`
+Per scheme, per trait (from `GBLUP.R`):
+- `cv_results_{SCHEME}_{TRAIT}_GBLUP.csv` — accuracy metrics per location-year
+- `predictions_{SCHEME}_{TRAIT}_GBLUP.csv` — individual held-out predictions
+- `varcomps_{SCHEME}_{TRAIT}_GBLUP.csv` — variance components (one row per `summary(model)$varcomp` entry, annotated with `trait`, `iteration`, `fold`, `seed`, `cv_scheme`)
+
+Combined across schemes, per trait (from `GBLUP.R`):
+- `cv_results_{TRAIT}_GBLUP_all_schemes.csv`
+- `cv_summary_{TRAIT}_GBLUP_all_schemes.csv` — mean / SD / min / max per scheme × location
+- `predictions_{TRAIT}_GBLUP_all_schemes.csv`
+- `varcomps_{TRAIT}_GBLUP_all_schemes.csv`
+
+Per-location pipeline (from `GBLUP_per_location_CV1.R`):
+- `per_location_variances_GBLUP.csv` — full-data variance components per `(trait, location)`: `n_obs`, `genetic_variance`, `residual_variance`, `h2`
+- `cv_results_CV1_{LOC}_{TRAIT}_GBLUP.csv` and `predictions_CV1_{LOC}_{TRAIT}_GBLUP.csv` — per-location CV1 outputs
+- `cv_results_{TRAIT}_GBLUP_CV1_per_location.csv` and `predictions_{TRAIT}_GBLUP_CV1_per_location.csv` — combined across locations per trait
+- `cv_summary_GBLUP_CV1_per_location.csv` — summary across all traits and locations
 
 ## Functions shared with BayesC/RKHS
 
-The following functions in `GBLUP_utils.R` are identical in logic to their counterparts in `BayesC_utils.R` and `RKHS_utils.R`:
+Identical-logic helpers in `GBLUP_utils.R` (mirrored in `BayesC_utils.R` and `RKHS_utils.R`):
 
-- `VALID_TRAITS`, `LOWER_IS_BETTER_TRAITS` — trait constants
-- `apply_location_year_scaling()` — z-score standardisation by location-year
-- `calculate_ndcg()` — NDCG@k metric
-- `evaluate_predictions()` — Pearson, Spearman, NDCG@10 evaluation
-- `summarise_cv_results()` — mean/SD/min/max summary per location
+- `VALID_TRAITS`, `LOWER_IS_BETTER_TRAITS`
+- `apply_location_year_scaling()` — z-score by location-year
+- `calculate_ndcg()` — NDCG@k
+- `evaluate_predictions()` — Pearson, Spearman, NDCG@10
+- `summarise_cv_results()` — mean / SD / min / max per trait × location
 
 ## Why `evaluate_per_location_year()` differs between GBLUP and BGLR pipelines
 
-The BayesC and RKHS pipelines (both using BGLR) use an **index-based** `evaluate_per_location_year()`:
+BayesC and RKHS (both BGLR) use an **index-based** `evaluate_per_location_year(observed_data, pred_values, test_indices, trait)`. BGLR returns predictions row-aligned with the input data, so evaluation is a positional lookup.
 
-```r
-evaluate_per_location_year(observed_data, pred_values, test_indices, trait)
-```
+GBLUP uses a **join-based** `evaluate_per_location_year(observed_data, pred_values, test_ids, trait)`. ASReml's `predict(model, classify = "sample.id:location:year")` returns the full factorial grid of all genotype × location × year combinations (including non-existent ones), so evaluation requires joining on `(sample.id, location_year)` to match predictions back to observations.
 
-BGLR returns predictions as a data frame with one row per observation in the same order as the input data. The function indexes directly into both `observed_data` and `pred_values` by row position (`test_indices`), so evaluation is a simple positional lookup.
-
-GBLUP uses a **join-based** `evaluate_per_location_year()`:
-
-```r
-evaluate_per_location_year(observed_data, pred_values, test_ids, trait)
-```
-
-ASReml's `predict(model, classify = "sample.id:location:year")` returns the full factorial grid of all genotype x location x year combinations (including ones that don't exist in the data). The output is not row-aligned with the input data, so evaluation requires joining on `(sample.id, location_year)` to match predictions to observations.
-
-Both approaches produce the same result — Pearson, Spearman, and NDCG@10 per location-year for the held-out observations. The difference is purely mechanical, driven by how each package returns predictions.
-
-**Important for CV2**: The join-based function uses genotype IDs (`test_ids`), not row indices. In CV2, masking is at the cell level — the same genotype may be masked in one location-year but observed in another. Using `evaluate_per_location_year()` with genotype IDs would match unmasked observations too, causing data leakage. For this reason, CV2 uses inline cell-level evaluation (tracking masked cells explicitly and joining by `(sample.id, location_year)`) rather than calling `evaluate_per_location_year()`.
+**CV2 caveat**: the join-based function uses genotype IDs (`test_ids`), not row indices. In CV2, masking is at the cell level — the same genotype may be masked in one location-year but observed in another. Using the join-based helper directly would match unmasked observations too, causing data leakage. CV2 therefore tracks masked cells explicitly and joins by `(sample.id, location_year)` inline rather than calling `evaluate_per_location_year()`.

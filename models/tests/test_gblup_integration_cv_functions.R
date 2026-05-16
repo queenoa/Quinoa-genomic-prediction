@@ -2,7 +2,7 @@ library(testthat)
 library(ASRgenomics)
 
 # Source GBLUP.R (which sources GBLUP_utils.R) from its directory
-old_wd <- setwd(file.path("..", "models", "GBLUP"))
+old_wd <- setwd(file.path("..", "GBLUP"))
 suppressPackageStartupMessages(source("GBLUP.R"))
 setwd(old_wd)
 
@@ -13,8 +13,8 @@ setwd(old_wd)
 #   2. Apply bending via ASRgenomics::G.tuneup() for positive definiteness
 #   3. Compute sparse inverse via ASRgenomics::G.inverse() for ASReml
 
-MARKER_FILE <- file.path("..", "data", "AUSPAK_test_subset_1k.raw")
-PHENO_FILE  <- file.path("..", "data", "AUSPAK_phenotypes_means_BLUEs.csv")
+MARKER_FILE <- file.path("..", "..", "data", "AUSPAK_test_subset_1k.raw")
+PHENO_FILE  <- file.path("..", "..", "data", "AUSPAK_phenotypes_GP_input.csv")
 
 build_test_ginv <- function(marker_file) {
   marker_data <- read.table(marker_file, header = TRUE)
@@ -68,7 +68,7 @@ setup_integration_data <- function() {
 }
 
 # Use a single trait and minimal settings for speed
-TEST_TRAIT   <- "PtHt_blue"
+TEST_TRAIT   <- "PtHt"
 K_FOLDS      <- 2
 N_ITERATIONS <- 2
 MIN_GENO     <- 5
@@ -510,7 +510,7 @@ test_that("CrossLoc trains on each location and predicts the other(s)", {
 
     # Each location should appear as training at least once
     for (loc in locations) {
-      if (sum(!is.na(test_env$pheno[["PtHt_blue"]][test_env$pheno$location == loc])) >= 50) {
+      if (sum(!is.na(test_env$pheno[["PtHt"]][test_env$pheno$location == loc])) >= 50) {
         expect_true(loc %in% train_locs,
                     info = paste(loc, "should appear as training location"))
       }
@@ -554,4 +554,116 @@ test_that("run_all_cv_schemes returns combined results from all schemes", {
   expect_true("CV2" %in% schemes)
   expect_true("CV0" %in% schemes)
   expect_true(any(grepl("CrossLoc_", schemes)))
+})
+
+# ============================================================================
+# Variance components (one row per varcomp per fit, annotated per scheme)
+# ============================================================================
+# Each CV runner returns a $varcomps data.frame in addition to $results and
+# $predictions. CV1/CV2 annotate with (trait, iteration, fold, seed,
+# cv_scheme); CV0 with (trait, held_out_location_year, held_out_location,
+# cv_scheme); CrossLoc with (trait, train_location, cv_scheme).
+
+test_that("CV1 returns varcomps annotated with iteration/fold/seed/scheme", {
+  setup_integration_data()
+
+  result <- run_cv1(
+    pheno_data = test_env$pheno, Ginv_sparse = test_env$Ginv_sparse,
+    traits = TEST_TRAIT, k_folds = K_FOLDS, n_iterations = N_ITERATIONS,
+    min_genotypes = MIN_GENO
+  )
+
+  expect_true("varcomps" %in% names(result))
+  vc <- result$varcomps
+
+  if (!is.null(vc) && nrow(vc) > 0) {
+    expect_true(all(c("component_name", "trait", "iteration", "fold",
+                       "seed", "cv_scheme") %in% names(vc)))
+    expect_true(all(vc$cv_scheme == "CV1"))
+    expect_true(all(vc$trait == TEST_TRAIT))
+  }
+})
+
+test_that("CV2 returns varcomps annotated with iteration/fold/seed/scheme", {
+  setup_integration_data()
+
+  result <- run_cv2(
+    pheno_data = test_env$pheno, Ginv_sparse = test_env$Ginv_sparse,
+    traits = TEST_TRAIT, k_folds = K_FOLDS, n_iterations = N_ITERATIONS,
+    min_genotypes = MIN_GENO
+  )
+
+  expect_true("varcomps" %in% names(result))
+  vc <- result$varcomps
+
+  if (!is.null(vc) && nrow(vc) > 0) {
+    expect_true(all(c("component_name", "trait", "iteration", "fold",
+                       "seed", "cv_scheme") %in% names(vc)))
+    expect_true(all(vc$cv_scheme == "CV2"))
+  }
+})
+
+test_that("CV0 returns varcomps annotated with held_out_location_year", {
+  setup_integration_data()
+
+  result <- run_cv0(
+    pheno_data = test_env$pheno, Ginv_sparse = test_env$Ginv_sparse,
+    traits = TEST_TRAIT, min_genotypes = MIN_GENO
+  )
+
+  expect_true("varcomps" %in% names(result))
+  vc <- result$varcomps
+
+  if (!is.null(vc) && nrow(vc) > 0) {
+    expect_true(all(c("component_name", "trait", "held_out_location_year",
+                       "held_out_location", "cv_scheme") %in% names(vc)))
+    expect_true(all(vc$cv_scheme == "CV0"))
+  }
+})
+
+test_that("CV0 uses homogeneous residual structure (units, not dsum)", {
+  # CV0 fits asreml inline in run_cv0 with `residual = ~ units` and
+  # `random = ~ vm(sample.id, Ginv_sparse) + location:year` (homogeneous),
+  # because heterogeneous dsum + at(location):year fails for AUS traits that
+  # have only two of three years when a location-year is held out.
+  setup_integration_data()
+
+  result <- run_cv0(
+    pheno_data = test_env$pheno, Ginv_sparse = test_env$Ginv_sparse,
+    traits = TEST_TRAIT, min_genotypes = MIN_GENO
+  )
+
+  vc <- result$varcomps
+  if (!is.null(vc) && nrow(vc) > 0) {
+    comp_names <- unique(vc$component_name)
+
+    # Single pooled residual (units!R or units!units) — NOT split per-location
+    expect_false(any(grepl("^AUS!|^PAK!", comp_names)),
+                 info = paste("CV0 should use homogeneous residuals;",
+                              "found per-location residual components:",
+                              paste(comp_names[grepl("^AUS!|^PAK!", comp_names)],
+                                    collapse = ", ")))
+
+    # Homogeneous location:year random term — NOT at(location, X):year
+    expect_false(any(grepl("^at\\(location", comp_names)),
+                 info = "CV0 should use location:year (homogeneous), not at(location):year")
+  }
+})
+
+test_that("CrossLoc returns varcomps annotated with train_location", {
+  setup_integration_data()
+
+  result <- run_cross_location(
+    pheno_data = test_env$pheno, Ginv_sparse = test_env$Ginv_sparse,
+    traits = TEST_TRAIT, min_genotypes = MIN_GENO
+  )
+
+  expect_true("varcomps" %in% names(result))
+  vc <- result$varcomps
+
+  if (!is.null(vc) && nrow(vc) > 0) {
+    expect_true(all(c("component_name", "trait", "train_location",
+                       "cv_scheme") %in% names(vc)))
+    expect_true(all(grepl("^CrossLoc_", vc$cv_scheme)))
+  }
 })

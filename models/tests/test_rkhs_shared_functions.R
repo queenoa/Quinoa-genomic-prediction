@@ -2,7 +2,7 @@ library(testthat)
 
 # Source from RKHS_utils.R (not BayesC_utils.R) to verify the copies are correct
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "RKHS_utils.R"))
+  source(file.path("..", "RKHS", "RKHS_utils.R"))
 )
 
 # ============================================================================
@@ -10,13 +10,13 @@ suppressPackageStartupMessages(
 # ============================================================================
 
 test_that("VALID_TRAITS matches BayesC", {
-  expected <- c('DTF_blue', 'DTH_blue', 'PtHt_blue', 'PcleLng_blue',
-                'SdLen_blue', 'TGW_blue', 'SdW_z_blue')
+  expected <- c('DTF', 'DTH', 'PtHt', 'PcleLng',
+                'SdLen', 'TGW', 'SdW_z')
   expect_equal(VALID_TRAITS, expected)
 })
 
 test_that("LOWER_IS_BETTER_TRAITS matches BayesC", {
-  expected <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
+  expected <- c('DTF', 'DTH', 'PtHt')
   expect_equal(LOWER_IS_BETTER_TRAITS, expected)
 })
 
@@ -132,7 +132,7 @@ test_that("evaluate_predictions returns pearson, spearman, ndcg_at_10", {
   y_true <- rnorm(50)
   y_pred <- y_true + rnorm(50, sd = 0.3)
 
-  res <- evaluate_predictions(y_true, y_pred, trait_name = "DTF_blue")
+  res <- evaluate_predictions(y_true, y_pred, trait_name = "DTF")
 
   expect_true(is.list(res))
   expect_named(res, c("pearson", "spearman", "ndcg_at_10"))
@@ -159,7 +159,7 @@ test_that("evaluate_per_location_year returns list with metrics and predictions"
     sample.id     = paste0("G", 1:n),
     location_year = rep(c("AUS_2019", "PAK_2019", "PAK_2020"), each = 20),
     location      = rep(c("AUS", "PAK", "PAK"), each = 20),
-    DTF_blue      = rnorm(n),
+    DTF      = rnorm(n),
     stringsAsFactors = FALSE
   )
 
@@ -167,13 +167,13 @@ test_that("evaluate_per_location_year returns list with metrics and predictions"
     sample.id     = observed_data$sample.id,
     location_year = observed_data$location_year,
     location      = observed_data$location,
-    predicted     = observed_data$DTF_blue + rnorm(n, sd = 0.5),
+    predicted     = observed_data$DTF + rnorm(n, sd = 0.5),
     stringsAsFactors = FALSE
   )
 
   result <- evaluate_per_location_year(
     observed_data, pred_values, test_indices = 1:n,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   expect_true(is.list(result))
@@ -190,7 +190,7 @@ test_that("evaluate_per_location_year: min_genotypes filter works", {
     sample.id     = paste0("G", 1:5),
     location_year = rep("AUS_2019", 5),
     location      = rep("AUS", 5),
-    DTF_blue      = rnorm(5),
+    DTF      = rnorm(5),
     stringsAsFactors = FALSE
   )
 
@@ -204,7 +204,7 @@ test_that("evaluate_per_location_year: min_genotypes filter works", {
 
   result <- evaluate_per_location_year(
     observed_data, pred_values, test_indices = 1:5,
-    trait = "DTF_blue", min_genotypes = 10
+    trait = "DTF", min_genotypes = 10
   )
 
   expect_equal(nrow(result$metrics), 0)

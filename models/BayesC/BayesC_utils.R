@@ -21,14 +21,14 @@ library(data.table)
 
 # ── Global constants ─────────────────────────────────────────────────────────
 
-VALID_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue', 'PcleLng_blue',
-                  'SdLen_blue', 'TGW_blue', 'SdW_z_blue')
+VALID_TRAITS <- c('DTF', 'DTH', 'PtHt', 'PcleLng',
+                  'SdLen', 'TGW', 'SdW_z')
 
-LOWER_IS_BETTER_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
+LOWER_IS_BETTER_TRAITS <- c('DTF', 'DTH', 'PtHt')
 
 # ── Data loading and preprocessing ───────────────────────────────────────────
 
-load_and_prepare_data <- function(trait, marker_file, pheno_file = "AUSPAK_phenotypes_means_BLUEs.csv") {
+load_and_prepare_data <- function(trait, marker_file, pheno_file = "../AUSPAK_phenotypes_GP_input.csv") {
   
   # Validate trait
   if (!trait %in% VALID_TRAITS) {
@@ -78,6 +78,10 @@ load_and_prepare_data <- function(trait, marker_file, pheno_file = "AUSPAK_pheno
   stopifnot(sum(is.na(X_geno)) == 0)
   
   rm(raw); gc()
+
+  # centre the marker matrix
+
+  X_geno <- scale(X_geno, center = TRUE, scale = FALSE)
   
   # Align phenotype and genotype data
   pheno$sample.id     <- as.character(pheno$sample.id)

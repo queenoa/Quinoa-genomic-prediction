@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "BayesC_utils.R"))
+  source(file.path("..", "BayesC", "BayesC_utils.R"))
 )
 
 # The function requires >= 50 non-NA observations total to apply scaling,

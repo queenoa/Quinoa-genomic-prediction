@@ -1,11 +1,11 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "RKHS_utils.R"))
+  source(file.path("..", "RKHS", "RKHS_utils.R"))
 )
 
-MARKER_FILE <- file.path("..", "data", "AUSPAK_test_subset_1k.raw")
-PHENO_FILE  <- file.path("..", "data", "AUSPAK_phenotypes_means_BLUEs.csv")
+MARKER_FILE <- file.path("..", "..", "data", "AUSPAK_test_subset_1k.raw")
+PHENO_FILE  <- file.path("..", "..", "data", "AUSPAK_phenotypes_GP_input.csv")
 
 # ── Input validation ─────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ test_that("invalid trait name is rejected", {
 
 test_that("missing phenotype file is rejected", {
   expect_error(
-    load_and_prepare_data("DTF_blue", MARKER_FILE, "nonexistent.csv"),
+    load_and_prepare_data("DTF", MARKER_FILE, "nonexistent.csv"),
     "Phenotype file not found"
   )
 })
@@ -31,7 +31,7 @@ test_that("returns a list with pheno, K_geno_list, h_values, med_D", {
   kcp <- file.path(tmpdir, "test_kernels.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
 
   expect_true(is.list(dat))
@@ -51,7 +51,7 @@ test_that("genotype-level kernels are square and match genotype count", {
   kcp <- file.path(tmpdir, "test_kernels2.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
 
   n_geno <- length(unique(dat$pheno$sample.id))
@@ -74,7 +74,7 @@ test_that("kernel checkpoint is created and loadable", {
   kcp <- file.path(tmpdir, "test_kernels_ckpt.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
 
   expect_true(file.exists(kcp))
@@ -96,12 +96,12 @@ test_that("loading from checkpoint produces identical results", {
   if (file.exists(kcp)) file.remove(kcp)
 
   # First call: compute kernels
-  dat1 <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat1 <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                  kernel_checkpoint = kcp)
   expect_true(file.exists(kcp))
 
   # Second call: load from checkpoint
-  dat2 <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat2 <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                  kernel_checkpoint = kcp)
 
   # Kernels should be identical
@@ -123,7 +123,7 @@ test_that("all pheno sample IDs exist in kernel matrices", {
   kcp <- file.path(tmpdir, "test_kernels_align.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
 
   pheno_ids <- unique(dat$pheno$sample.id)
@@ -138,9 +138,9 @@ test_that("pheno contains required columns", {
   kcp <- file.path(tmpdir, "test_kernels_cols.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
-  required <- c("sample.id", "location", "year", "location_year", "DTF_blue")
+  required <- c("sample.id", "location", "year", "location_year", "DTF")
   expect_true(all(required %in% names(dat$pheno)))
 
   if (file.exists(kcp)) file.remove(kcp)
@@ -151,12 +151,12 @@ test_that("trait values are z-scored (mean ~0 per location-year)", {
   kcp <- file.path(tmpdir, "test_kernels_zscore.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  dat <- load_and_prepare_data("DTF_blue", MARKER_FILE, PHENO_FILE,
+  dat <- load_and_prepare_data("DTF", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
   pheno <- dat$pheno
 
   for (ly in unique(pheno$location_year)) {
-    vals <- pheno$DTF_blue[pheno$location_year == ly & !is.na(pheno$DTF_blue)]
+    vals <- pheno$DTF[pheno$location_year == ly & !is.na(pheno$DTF)]
     if (length(vals) > 10) {
       expect_equal(mean(vals), 0, tolerance = 1e-8,
                    label = paste(ly, "mean"))
@@ -173,13 +173,13 @@ test_that("empty location-years are NOT dropped (intentional for RKHS)", {
   kcp <- file.path(tmpdir, "test_kernels_empty.RData")
   if (file.exists(kcp)) file.remove(kcp)
 
-  # SdW_z_blue often has empty location-years
-  dat <- load_and_prepare_data("SdW_z_blue", MARKER_FILE, PHENO_FILE,
+  # SdW_z often has empty location-years
+  dat <- load_and_prepare_data("SdW_z", MARKER_FILE, PHENO_FILE,
                                 kernel_checkpoint = kcp)
   pheno <- dat$pheno
 
   # Check if any location-year has 0 observed values
-  ly_obs_counts <- tapply(!is.na(pheno$SdW_z_blue), pheno$location_year, sum)
+  ly_obs_counts <- tapply(!is.na(pheno$SdW_z), pheno$location_year, sum)
   has_empty <- any(ly_obs_counts == 0)
 
   # Either there are no empty LYs in this trait, or they are kept

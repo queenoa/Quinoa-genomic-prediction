@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "BayesC_utils.R"))
+  source(file.path("..", "BayesC", "BayesC_utils.R"))
 )
 
 # ── build_obs_marker_matrix ──────────────────────────────────────────────────

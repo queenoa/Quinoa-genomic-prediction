@@ -19,13 +19,13 @@
 # Usage:
 #   bash launch_RKHS_jobs.sh                    # generate scripts only
 #   bash launch_RKHS_jobs.sh submit             # generate and submit all
-#   bash launch_RKHS_jobs.sh submit DTF_blue    # submit one trait only
+#   bash launch_RKHS_jobs.sh submit DTF         # submit one trait only
 #
 # After all jobs finish, run the aggregation script:
 #   Rscript aggregate_RKHS_results.R all
 ################################################################################
 
-# ── SLURM parameters (EDIT THESE) ────────────────────────────────────────────
+# ── SLURM parameters ────────────────────────────────────────────
 
 PARTITION="batch"
 
@@ -50,9 +50,9 @@ RKHS_BURNIN=""               # leave empty to use script default (5000)
 RKHS_THIN=""                 # leave empty to use script default (5)
 
 ACCOUNT=""                   # leave empty if not needed
-MAIL=""
+MAIL="stansccs@kaust.edu.sa"
 
-# ── Paths (EDIT THESE) ───────────────────────────────────────────────────────
+# ── Paths  ───────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK_DIR="${SCRIPT_DIR}"     # where phenotype + genotype + R scripts live
@@ -60,7 +60,7 @@ MARKER_FILE="auspak_for_rkhs.raw"
 
 # ── Traits ───────────────────────────────────────────────────────────────────
 
-TRAITS=("DTF_blue" "DTH_blue" "PtHt_blue" "PcleLng_blue" "SdLen_blue" "TGW_blue" "SdW_z_blue")
+TRAITS=("DTF" "DTH" "PtHt" "PcleLng" "SdLen" "TGW" "SdW_z")
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 

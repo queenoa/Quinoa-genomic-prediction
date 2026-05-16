@@ -23,9 +23,9 @@ class TestConstants:
         assert set(LOWER_IS_BETTER_TRAITS).issubset(set(VALID_TRAITS))
 
     def test_lower_is_better_contains_expected(self):
-        assert 'DTF_blue' in LOWER_IS_BETTER_TRAITS
-        assert 'DTH_blue' in LOWER_IS_BETTER_TRAITS
-        assert 'PtHt_blue' in LOWER_IS_BETTER_TRAITS
+        assert 'DTF' in LOWER_IS_BETTER_TRAITS
+        assert 'DTH' in LOWER_IS_BETTER_TRAITS
+        assert 'PtHt' in LOWER_IS_BETTER_TRAITS
 
     def test_default_params_keys(self):
         assert set(DEFAULT_PARAMS.keys()) == {'max_depth', 'learning_rate', 'n_estimators'}
@@ -36,26 +36,26 @@ class TestConstants:
 class TestFetchModelParams:
 
     def test_none_returns_defaults(self):
-        assert fetch_model_params(None, 'DTF_blue') == DEFAULT_PARAMS
+        assert fetch_model_params(None, 'DTF') == DEFAULT_PARAMS
 
     def test_flat_dict_returned_as_is(self):
         flat = {'max_depth': 5, 'learning_rate': 0.1, 'n_estimators': 200}
-        assert fetch_model_params(flat, 'DTF_blue') == flat
+        assert fetch_model_params(flat, 'DTF') == flat
 
     def test_per_trait_dict(self):
         per_trait = {
-            'DTF_blue': {'max_depth': 4, 'learning_rate': 0.03, 'n_estimators': 1000},
-            'TGW_blue': {'max_depth': 6, 'learning_rate': 0.1, 'n_estimators': 200},
+            'DTF': {'max_depth': 4, 'learning_rate': 0.03, 'n_estimators': 1000},
+            'TGW': {'max_depth': 6, 'learning_rate': 0.1, 'n_estimators': 200},
         }
-        result = fetch_model_params(per_trait, 'DTF_blue')
-        assert result == per_trait['DTF_blue']
+        result = fetch_model_params(per_trait, 'DTF')
+        assert result == per_trait['DTF']
 
     def test_per_trait_dict_missing_trait_returns_whole_dict(self):
         per_trait = {
-            'DTF_blue': {'max_depth': 4},
+            'DTF': {'max_depth': 4},
         }
-        # SdLen_blue not in dict → returns the outer dict itself (flat fallback)
-        result = fetch_model_params(per_trait, 'SdLen_blue')
+        # SdLen not in dict → returns the outer dict itself (flat fallback)
+        result = fetch_model_params(per_trait, 'SdLen')
         assert result == per_trait
 
 
@@ -99,7 +99,7 @@ class TestEvaluatePredictions:
 
     def test_perfect_prediction(self):
         y = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
-        result = evaluate_predictions(y, y, trait_name='TGW_blue')
+        result = evaluate_predictions(y, y, trait_name='TGW')
         assert result['pearson'] == pytest.approx(1.0)
         assert result['spearman'] == pytest.approx(1.0)
         assert result['ndcg_at_10'] == pytest.approx(1.0)
@@ -117,7 +117,7 @@ class TestEvaluatePredictions:
 
     def test_lower_is_better_trait_recognised(self):
         y_true = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
-        result = evaluate_predictions(y_true, y_true, trait_name='DTF_blue')
+        result = evaluate_predictions(y_true, y_true, trait_name='DTF')
         # Perfect ranking should still give 1.0 regardless of direction
         assert result['ndcg_at_10'] == pytest.approx(1.0)
 
@@ -131,9 +131,9 @@ class TestEvaluatePredictions:
 
 class TestApplyLocationYearScaling:
 
-    def test_output_has_zero_mean_unit_std(self, model_input_pc):
-        traits = ['DTF_blue', 'TGW_blue']
-        scaled = apply_location_year_scaling(model_input_pc, traits)
+    def test_output_has_zero_mean_unit_std(self, model_input_kinship):
+        traits = ['DTF', 'TGW']
+        scaled = apply_location_year_scaling(model_input_kinship, traits)
 
         for trait in traits:
             for ly in scaled['location_year'].unique():
@@ -144,10 +144,10 @@ class TestApplyLocationYearScaling:
                     assert vals.mean() == pytest.approx(0.0, abs=1e-10)
                     assert vals.std() == pytest.approx(1.0, abs=1e-10)
 
-    def test_does_not_modify_original(self, model_input_pc):
-        original = model_input_pc.copy()
-        apply_location_year_scaling(model_input_pc, ['TGW_blue'])
-        pd.testing.assert_frame_equal(model_input_pc, original)
+    def test_does_not_modify_original(self, model_input_kinship):
+        original = model_input_kinship.copy()
+        apply_location_year_scaling(model_input_kinship, ['TGW'])
+        pd.testing.assert_frame_equal(model_input_kinship, original)
 
     def test_skips_trait_with_few_observations(self):
         """Traits with <50 non-null values should be left unchanged."""
@@ -173,10 +173,10 @@ class TestApplyLocationYearScaling:
         # (5 - 5) / 1 = 0
         assert (scaled['trait'] == 0.0).all()
 
-    def test_nans_preserved(self, model_input_pc):
-        nan_before = model_input_pc['DTF_blue'].isna().sum()
-        scaled = apply_location_year_scaling(model_input_pc, ['DTF_blue'])
-        nan_after = scaled['DTF_blue'].isna().sum()
+    def test_nans_preserved(self, model_input_kinship):
+        nan_before = model_input_kinship['DTF'].isna().sum()
+        scaled = apply_location_year_scaling(model_input_kinship, ['DTF'])
+        nan_after = scaled['DTF'].isna().sum()
         assert nan_after == nan_before
 
 
@@ -185,7 +185,7 @@ class TestApplyLocationYearScaling:
 class TestEvaluatePerLocationYear:
 
     def test_returns_one_row_per_location_year(self, predictions_df):
-        result = evaluate_per_location_year(predictions_df, 'TGW_blue',
+        result = evaluate_per_location_year(predictions_df, 'TGW',
                                             min_genotypes=10)
         assert len(result) == predictions_df['location_year'].nunique()
 
@@ -198,11 +198,11 @@ class TestEvaluatePerLocationYear:
         rest = predictions_df[predictions_df['location_year'] != 'LocA_2020']
         df = pd.concat([small, rest], ignore_index=True)
 
-        result = evaluate_per_location_year(df, 'TGW_blue', min_genotypes=10)
+        result = evaluate_per_location_year(df, 'TGW', min_genotypes=10)
         assert 'LocA_2020' not in result['location_year'].values
 
     def test_output_columns(self, predictions_df):
-        result = evaluate_per_location_year(predictions_df, 'TGW_blue')
+        result = evaluate_per_location_year(predictions_df, 'TGW')
         expected_cols = {'trait', 'location_year', 'location', 'pearson',
                          'spearman', 'ndcg_at_10', 'n_test_genotypes'}
         assert expected_cols == set(result.columns)
@@ -216,7 +216,7 @@ class TestEvaluatePerLocationYear:
             'observed': [1.0, 2.0],
             'predicted': [1.1, 2.1],
         })
-        result = evaluate_per_location_year(df, 'TGW_blue', min_genotypes=10)
+        result = evaluate_per_location_year(df, 'TGW', min_genotypes=10)
         assert len(result) == 0
 
 
@@ -225,7 +225,7 @@ class TestEvaluatePerLocationYear:
 class TestSummariseCVResults:
 
     def test_summary_has_expected_columns(self, predictions_df):
-        result = evaluate_per_location_year(predictions_df, 'TGW_blue')
+        result = evaluate_per_location_year(predictions_df, 'TGW')
         summary = summarise_cv_results(result, 'TestScheme')
         expected = {'trait', 'location', 'pearson_mean', 'pearson_std',
                     'pearson_min', 'pearson_max', 'spearman_mean', 'spearman_std',

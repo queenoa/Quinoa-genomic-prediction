@@ -5,6 +5,11 @@
 #   CV0: Leave-one-location-year-out
 #   Cross-location transferability: within-location GBLUP -> predict other location
 #
+# Heterogeneous variance version:
+#   residual = ~ dsum(~ units | location)
+#   random   = ~ vm(sample.id, Ginv_sparse) + at(location):year
+# Variance components from summary(model)$varcomp are captured per fit.
+#
 # REVISION NOTES:
 # - fit_gblup_and_predict uses a unified NA-masking approach:
 #   the full dataset is passed to asreml with target cells set to NA,
@@ -12,7 +17,9 @@
 #   Used by CV0, CV1, and CV2.
 # - Cross-location uses a separate, simpler within-location GBLUP
 #   (intercept + G matrix only) because location-level fixed effects
-#   cannot be estimated when all data for one location is NA.
+#   cannot be estimated when all data for one location is NA. Within a
+#   single location dsum/at(location) collapse to homogeneous, so the
+#   cross-location model retains ~ units residual and ~ vm() random.
 
 source("GBLUP_utils.R")
 
@@ -65,6 +72,8 @@ run_cv1 <- function(pheno_data, Ginv_sparse, traits,
     stringsAsFactors = FALSE
   )
 
+  cv_varcomps <- data.frame()
+
   genotypes <- levels(pheno_data$sample.id)
   n_genotypes <- length(genotypes)
 
@@ -94,13 +103,25 @@ run_cv1 <- function(pheno_data, Ginv_sparse, traits,
           mask_rows <- model_data$sample.id %in% test_genotypes
           model_data[[trait]][mask_rows] <- NA
 
-          pred_values <- fit_gblup_and_predict(
+          model_out <- fit_gblup_and_predict(
             model_data = model_data,
             trait = trait,
             Ginv_sparse = Ginv_sparse
           )
 
-          if (is.null(pred_values)) next
+          if (is.null(model_out)) next
+
+          pred_values <- model_out$pred_values
+
+          if (!is.null(model_out$varcomp) && nrow(model_out$varcomp) > 0) {
+            vc <- model_out$varcomp
+            vc$trait <- trait
+            vc$iteration <- iter
+            vc$fold <- fold
+            vc$seed <- current_seed
+            vc$cv_scheme <- "CV1"
+            cv_varcomps <- rbind(cv_varcomps, vc)
+          }
 
           eval_out <- evaluate_per_location_year(
             observed_data = pheno_data_observed,
@@ -141,6 +162,7 @@ run_cv1 <- function(pheno_data, Ginv_sparse, traits,
   return(list(
     results = cv_results,
     predictions = cv_predictions,
+    varcomps = cv_varcomps,
     summary = summary_stats,
     n_genotypes = n_genotypes,
     n_location_years = length(levels(pheno_data$location_year)),
@@ -212,6 +234,8 @@ run_cv2 <- function(pheno_data, Ginv_sparse, traits,
     stringsAsFactors = FALSE
   )
 
+  cv_varcomps <- data.frame()
+
   for (iter in 1:n_iterations) {
     current_seed <- 2000 + iter
     set.seed(current_seed)
@@ -274,13 +298,25 @@ run_cv2 <- function(pheno_data, Ginv_sparse, traits,
                 paste(thin_lys, collapse = ", "), "\n")
           }
 
-          pred_values <- fit_gblup_and_predict(
+          model_out <- fit_gblup_and_predict(
             model_data = model_data,
             trait = trait,
             Ginv_sparse = Ginv_sparse
           )
 
-          if (is.null(pred_values)) next
+          if (is.null(model_out)) next
+
+          pred_values <- model_out$pred_values
+
+          if (!is.null(model_out$varcomp) && nrow(model_out$varcomp) > 0) {
+            vc <- model_out$varcomp
+            vc$trait <- trait
+            vc$iteration <- iter
+            vc$fold <- fold
+            vc$seed <- current_seed
+            vc$cv_scheme <- "CV2"
+            cv_varcomps <- rbind(cv_varcomps, vc)
+          }
 
           # Match predictions to the specifically masked cells
           pred_subset <- pred_values %>%
@@ -363,6 +399,7 @@ run_cv2 <- function(pheno_data, Ginv_sparse, traits,
   return(list(
     results = cv_results,
     predictions = cv_predictions,
+    varcomps = cv_varcomps,
     summary = summary_stats,
     zscore_applied = apply_zscore,
     cv_scheme = "CV2"
@@ -416,6 +453,8 @@ run_cv0 <- function(pheno_data, Ginv_sparse, traits,
     stringsAsFactors = FALSE
   )
 
+  cv_varcomps <- data.frame()
+
   for (held_out_ly in location_years) {
     cat("Holding out:", held_out_ly, "\n")
 
@@ -447,13 +486,66 @@ run_cv0 <- function(pheno_data, Ginv_sparse, traits,
         mask_rows <- model_data$location_year == held_out_ly
         model_data[[trait]][mask_rows] <- NA
 
-        pred_values <- fit_gblup_and_predict(
-          model_data = model_data,
-          trait = trait,
-          Ginv_sparse = Ginv_sparse
-        )
+        # CV0 uses homogeneous residuals: AUS traits with only two of three
+        # years cause the heterogeneous (dsum / at(location):year) fit to
+        # fail when a whole location-year is held out.
+        model <- tryCatch({
+          asreml(
+            fixed = as.formula(paste(trait, "~ location")),
+            random = ~ vm(sample.id, Ginv_sparse) + location:year,
+            residual = ~ units,
+            na.action = na.method(y = "include"),
+            workspace = 256e06,
+            data = model_data,
+            maxit = 200,
+            trace = FALSE
+          )
+        }, error = function(e) {
+          warning(paste("Model fitting error for", trait, ":", e$message))
+          return(NULL)
+        })
 
-        if (is.null(pred_values)) next
+        if (is.null(model) || !model$converge) {
+          cat("    Model did not converge\n")
+          next
+        }
+
+        predictions <- tryCatch({
+          predict(model, classify = "sample.id:location:year",
+                  pworkspace = 256e06, trace = FALSE)
+        }, error = function(e) {
+          warning(paste("Prediction error for", trait, ":", e$message))
+          return(NULL)
+        })
+
+        if (is.null(predictions$pvals)) next
+
+        pred_values <- predictions$pvals
+        pred_values$sample.id <- as.character(pred_values$sample.id)
+        pred_values$location <- as.character(pred_values$location)
+        pred_values$year <- as.character(pred_values$year)
+        pred_values$location_year <- paste(pred_values$location,
+                                            pred_values$year, sep = "_")
+
+        # Filter to only location-years present in the input data
+        real_lys <- unique(as.character(model_data$location_year))
+        pred_values <- pred_values[pred_values$location_year %in% real_lys, ]
+
+        vc_raw <- summary(model)$varcomp
+        if (!is.null(vc_raw) && nrow(vc_raw) > 0) {
+          vc <- data.frame(
+            component_name = rownames(vc_raw),
+            vc_raw,
+            row.names = NULL,
+            stringsAsFactors = FALSE,
+            check.names = FALSE
+          )
+          vc$trait <- trait
+          vc$held_out_location_year <- held_out_ly
+          vc$held_out_location <- held_out_location
+          vc$cv_scheme <- "CV0"
+          cv_varcomps <- rbind(cv_varcomps, vc)
+        }
 
         # Extract predictions for the held-out location-year
         pred_in_ly <- pred_values %>%
@@ -530,6 +622,7 @@ run_cv0 <- function(pheno_data, Ginv_sparse, traits,
   return(list(
     results = cv_results,
     predictions = cv_predictions,
+    varcomps = cv_varcomps,
     summary = summary_stats,
     zscore_applied = apply_zscore,
     cv_scheme = "CV0"
@@ -588,6 +681,8 @@ run_cross_location <- function(pheno_data, Ginv_sparse, traits,
     stringsAsFactors = FALSE
   )
 
+  cv_varcomps <- data.frame()
+
   for (train_loc in locations) {
     predict_loc <- setdiff(locations, train_loc)
 
@@ -622,6 +717,23 @@ run_cross_location <- function(pheno_data, Ginv_sparse, traits,
         if (is.null(model) || !model$converge) {
           cat("    Model did not converge\n")
           next
+        }
+
+        # Capture variance components from this within-location fit
+        vc_raw <- summary(model)$varcomp
+        if (!is.null(vc_raw) && nrow(vc_raw) > 0) {
+          vc <- data.frame(
+            component_name = rownames(vc_raw),
+            vc_raw,
+            row.names = NULL,
+            stringsAsFactors = FALSE,
+            check.names = FALSE
+          )
+          vc$trait <- trait
+          vc$train_location <- train_loc
+          vc$cv_scheme <- paste0("CrossLoc_", train_loc, "->",
+                                 paste(predict_loc, collapse = "+"))
+          cv_varcomps <- rbind(cv_varcomps, vc)
         }
 
         # Extract genomic BLUPs
@@ -748,6 +860,7 @@ run_cross_location <- function(pheno_data, Ginv_sparse, traits,
   return(list(
     results = cv_results,
     predictions = cv_predictions,
+    varcomps = cv_varcomps,
     summary = summary_stats,
     zscore_applied = apply_zscore,
     cv_scheme = "CrossLocation"
@@ -810,23 +923,29 @@ run_all_cv_schemes <- function(pheno_data, Ginv_sparse, traits,
 # ============================================================================
 # RUN PIPELINE
 # ============================================================================
+# sys.nframe() == 0 means the script was invoked directly (Rscript / source
+# from R prompt). When it's source()'d from inside a function (e.g. tests),
+# the run-pipeline block is skipped so the script can be loaded for its
+# function definitions only.
+
+if (sys.nframe() == 0) {
 
 # Load G-inverse (produced by G_matrix_GBLUP.R)
 load("Ginv_sparse_GBLUP.RData")
 
 # Load phenotype data
 pheno_data <- read.csv(file.path("..", "..", "data",
-                                  "AUSPAK_phenotypes_means_BLUEs.csv"),
+                                  "AUSPAK_phenotypes_GP_input.csv"),
                         stringsAsFactors = FALSE)
 
 # Run all CV schemes
 all_cv <- run_all_cv_schemes(
   pheno_data = pheno_data,
-  Ginv_sparse = Ginv_sparse,
-  traits = c("SdW_z_blue", "DTF_blue", "DTH_blue", "PtHt_blue",
-             "PcleLng_blue", "SdLen_blue", "TGW_blue"),
+  Ginv_sparse= Ginv_sparse,
+  traits = c("DTF", "DTH", "PtHt", "PcleLng",
+                  "SdLen", "TGW", "SdW_z"),
   k_folds = 5,
-  n_iterations = 15,
+  n_iterations = 1,
   apply_zscore = TRUE,
   min_genotypes = 10
 )
@@ -839,14 +958,15 @@ all_cv <- run_all_cv_schemes(
 scheme_labels <- c(cv1 = "CV1", cv2 = "CV2", cv0 = "CV0",
                    cross_loc = "CrossLoc")
 
-traits <- c("SdW_z_blue", "DTF_blue", "DTH_blue", "PtHt_blue",
-            "PcleLng_blue", "SdLen_blue", "TGW_blue")
+traits <- c("DTF", "DTH", "PtHt", "PcleLng",
+                  "SdLen", "TGW", "SdW_z")
 
 # --- Per-scheme, per-trait CSVs ---
 for (scheme in names(scheme_labels)) {
   label <- scheme_labels[[scheme]]
-  res   <- all_cv[[scheme]]$results
-  preds <- all_cv[[scheme]]$predictions
+  res    <- all_cv[[scheme]]$results
+  preds  <- all_cv[[scheme]]$predictions
+  vcomps <- all_cv[[scheme]]$varcomps
 
   for (trait in traits) {
     trait_res <- res[res$trait == trait, ]
@@ -861,6 +981,15 @@ for (scheme in names(scheme_labels)) {
       outfile <- paste0("predictions_", label, "_", trait, "_GBLUP.csv")
       write.csv(trait_preds, outfile, row.names = FALSE)
       cat("Saved:", outfile, "(", nrow(trait_preds), "rows)\n")
+    }
+
+    if (!is.null(vcomps) && nrow(vcomps) > 0) {
+      trait_vcomps <- vcomps[vcomps$trait == trait, ]
+      if (nrow(trait_vcomps) > 0) {
+        outfile <- paste0("varcomps_", label, "_", trait, "_GBLUP.csv")
+        write.csv(trait_vcomps, outfile, row.names = FALSE)
+        cat("Saved:", outfile, "(", nrow(trait_vcomps), "rows)\n")
+      }
     }
   }
 }
@@ -879,6 +1008,13 @@ all_summaries <- bind_rows(
     if (nrow(s) > 0) { s$cv_scheme <- scheme_labels[[scheme]] }
     s
   })
+)
+
+all_varcomps <- bind_rows(
+  all_cv$cv1$varcomps,
+  all_cv$cv2$varcomps,
+  all_cv$cv0$varcomps,
+  all_cv$cross_loc$varcomps
 )
 
 for (trait in traits) {
@@ -905,6 +1041,18 @@ for (trait in traits) {
     write.csv(trait_preds, outfile, row.names = FALSE)
     cat("Saved:", outfile, "(", nrow(trait_preds), "rows)\n")
   }
+
+  # All variance components across schemes
+  if (!is.null(all_varcomps) && nrow(all_varcomps) > 0) {
+    trait_vcomps <- all_varcomps[all_varcomps$trait == trait, ]
+    if (nrow(trait_vcomps) > 0) {
+      outfile <- paste0("varcomps_", trait, "_GBLUP_all_schemes.csv")
+      write.csv(trait_vcomps, outfile, row.names = FALSE)
+      cat("Saved:", outfile, "(", nrow(trait_vcomps), "rows)\n")
+    }
+  }
 }
 
 cat("\n=== All outputs saved ===\n")
+
+} # end if (sys.nframe() == 0)

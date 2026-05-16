@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "aggregate_RKHS_results.R"))
+  source(file.path("..", "RKHS", "aggregate_RKHS_results.R"))
 )
 
 # ============================================================================
@@ -15,7 +15,7 @@ test_that("read_if_exists returns NULL for missing file", {
 
 test_that("read_if_exists reads existing CSV correctly", {
   tmpfile <- tempfile(fileext = ".csv")
-  df <- data.frame(trait = "DTF_blue", pearson = 0.5, stringsAsFactors = FALSE)
+  df <- data.frame(trait = "DTF", pearson = 0.5, stringsAsFactors = FALSE)
   write.csv(df, tmpfile, row.names = FALSE)
 
   result <- read_if_exists(tmpfile, "test")
@@ -57,7 +57,7 @@ test_that("compute_summary returns NULL for empty data frame", {
 
 test_that("compute_summary groups by trait, cv_scheme, location", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 6),
+    trait = rep("DTF", 6),
     cv_scheme = rep(c("CV1", "CV2"), each = 3),
     location = rep("AUS", 6),
     pearson = c(0.5, 0.6, 0.7, 0.3, 0.4, 0.5),
@@ -79,7 +79,7 @@ test_that("compute_summary groups by trait, cv_scheme, location", {
 
 test_that("compute_summary calculates correct mean and sd", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     cv_scheme = rep("CV1", 4),
     location = rep("AUS", 4),
     pearson = c(0.4, 0.6, 0.8, 1.0),
@@ -100,7 +100,7 @@ test_that("compute_summary calculates correct mean and sd", {
 
 test_that("compute_summary separates locations", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     cv_scheme = rep("CV1", 4),
     location = c("AUS", "AUS", "PAK", "PAK"),
     pearson = c(0.5, 0.6, 0.3, 0.4),
@@ -125,7 +125,7 @@ test_that("compute_summary separates locations", {
 
 test_that("compute_summary handles CrossLoc scheme names", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     cv_scheme = c("CrossLoc_AUS->PAK", "CrossLoc_AUS->PAK",
                   "CrossLoc_PAK->AUS", "CrossLoc_PAK->AUS"),
     location = c("PAK", "PAK", "AUS", "AUS"),

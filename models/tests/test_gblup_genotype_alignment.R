@@ -2,7 +2,7 @@ library(testthat)
 library(Matrix)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "GBLUP", "GBLUP_utils.R"))
+  source(file.path("..", "GBLUP", "GBLUP_utils.R"))
 )
 
 # ── Helper: create mock Ginv sparse matrix with given genotype IDs ──────────
@@ -24,7 +24,7 @@ make_pheno <- function(geno_ids, lys = c("AUS_2019", "PAK_2020")) {
     location_year = rep(lys, each = n_geno),
     location      = rep(sub("_.*", "", lys), each = n_geno),
     year          = rep(sub(".*_", "", lys), each = n_geno),
-    DTF_blue      = rnorm(n_geno * n_ly),
+    DTF      = rnorm(n_geno * n_ly),
     stringsAsFactors = FALSE
   )
 }
@@ -76,7 +76,7 @@ test_that("trait values are not modified", {
 
   result <- align_genotypes_to_gmatrix(pheno, Ginv)
 
-  expect_equal(result$DTF_blue, pheno$DTF_blue)
+  expect_equal(result$DTF, pheno$DTF)
 })
 
 # ============================================================================
@@ -175,7 +175,7 @@ test_that("numeric sample.id is coerced to character then factor", {
     location_year = rep(c("AUS_2019", "PAK_2020"), each = 5),
     location      = rep(c("AUS", "PAK"), each = 5),
     year          = rep(c("2019", "2020"), each = 5),
-    DTF_blue      = rnorm(10),
+    DTF      = rnorm(10),
     stringsAsFactors = FALSE
   )
 

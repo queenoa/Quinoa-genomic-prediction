@@ -1,6 +1,7 @@
 """Tests for Prepare_input_data.py — one_hot_encode function.
 
-Uses real data subsets loaded via conftest fixtures.
+Uses real data subsets loaded via conftest fixtures. Production pipeline is
+kinship-only (commit c97e97a dropped PC features).
 """
 
 import numpy as np
@@ -13,9 +14,12 @@ from Prepare_input_data import one_hot_encode
 class TestOneHotEncode:
 
     @pytest.fixture
-    def raw_merge(self, pheno_subset, pca_subset):
-        """Merged pheno + PCA before one-hot encoding (mirrors Prepare_input_data.py)."""
-        return pd.merge(pca_subset, pheno_subset.reset_index(), on='sample.id')
+    def raw_merge(self, pheno_subset, kinship_subset):
+        """Merged kinship + pheno before one-hot encoding (mirrors Prepare_input_data.py)."""
+        kinship_subset.index.name = 'sample.id'
+        kin_df = kinship_subset.reset_index()
+        kin_df.columns = ['sample.id'] + [f'K_{c}' for c in kinship_subset.columns]
+        return pd.merge(kin_df, pheno_subset, on='sample.id')
 
     def test_year_column_dropped(self, raw_merge):
         result = one_hot_encode(raw_merge)
@@ -44,8 +48,9 @@ class TestOneHotEncode:
     def test_original_columns_preserved(self, raw_merge):
         result = one_hot_encode(raw_merge)
         assert 'sample.id' in result.columns
-        assert 'PC1' in result.columns
-        assert 'DTF_blue' in result.columns
+        # First kinship column should still be present after one-hot encoding
+        assert any(c.startswith('K_') for c in result.columns)
+        assert 'DTF' in result.columns
         assert 'location' in result.columns
         assert 'location_year' in result.columns
 

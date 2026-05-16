@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "BayesC_utils.R"))
+  source(file.path("..", "BayesC", "BayesC_utils.R"))
 )
 
 # Build a synthetic dataset for these tests
@@ -11,7 +11,7 @@ make_test_data <- function() {
     sample.id     = paste0("G", 1:(n_per_ly * 3)),
     location_year = rep(c("AUS_2019", "PAK_2019", "PAK_2020"), each = n_per_ly),
     location      = rep(c("AUS", "PAK", "PAK"), each = n_per_ly),
-    DTF_blue      = rnorm(n_per_ly * 3),
+    DTF      = rnorm(n_per_ly * 3),
     stringsAsFactors = FALSE
   )
 
@@ -20,7 +20,7 @@ make_test_data <- function() {
     sample.id     = observed_data$sample.id,
     location_year = observed_data$location_year,
     location      = observed_data$location,
-    predicted     = observed_data$DTF_blue + rnorm(n_per_ly * 3, sd = 0.5),
+    predicted     = observed_data$DTF + rnorm(n_per_ly * 3, sd = 0.5),
     stringsAsFactors = FALSE
   )
 
@@ -34,7 +34,7 @@ test_that("returns list with metrics and predictions", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   expect_true(is.list(result))
@@ -50,7 +50,7 @@ test_that("metrics have correct columns", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   expected_cols <- c("trait", "location_year", "location",
@@ -65,7 +65,7 @@ test_that("one row per location-year in metrics", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   expect_equal(nrow(result$metrics), 3)
@@ -81,7 +81,7 @@ test_that("min_genotypes filter skips small location-years", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 10
+    trait = "DTF", min_genotypes = 10
   )
 
   # 5 < 10, so AUS_2019 should be skipped -> empty metrics
@@ -96,7 +96,7 @@ test_that("predictions contain all valid test observations", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   # All 60 observations have non-NA observed and predicted
@@ -109,12 +109,12 @@ test_that("NA observed values are excluded from predictions", {
   set.seed(42)
   td <- make_test_data()
   # Set some observed values to NA
-  td$observed_data$DTF_blue[1:5] <- NA
+  td$observed_data$DTF[1:5] <- NA
   test_indices <- 1:20
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   # 20 test indices - 5 NA = 15 valid predictions
@@ -125,12 +125,12 @@ test_that("NA observed values are excluded from predictions", {
 test_that("returns empty metrics when all observed values are NA", {
   set.seed(42)
   td <- make_test_data()
-  td$observed_data$DTF_blue[1:20] <- NA
+  td$observed_data$DTF[1:20] <- NA
   test_indices <- 1:20
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   # No valid pairs -> returns empty metrics data.frame (not a list)
@@ -145,7 +145,7 @@ test_that("correlations are between -1 and 1", {
 
   result <- evaluate_per_location_year(
     td$observed_data, td$pred_values, test_indices,
-    trait = "DTF_blue", min_genotypes = 5
+    trait = "DTF", min_genotypes = 5
   )
 
   expect_true(all(result$metrics$pearson >= -1 & result$metrics$pearson <= 1))

@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "RKHS_utils.R"))
+  source(file.path("..", "RKHS", "RKHS_utils.R"))
 )
 
 # ── Build a minimal but realistic test dataset ────────────────────────────────
@@ -9,8 +9,8 @@ suppressPackageStartupMessages(
 # Uses the real AUSPAK 1k-marker subset and real phenotype data so we test
 # on actual data structure. MCMC is kept very short (100/50/5) for speed.
 
-MARKER_FILE <- file.path("..", "data", "AUSPAK_test_subset_1k.raw")
-PHENO_FILE  <- file.path("..", "data", "AUSPAK_phenotypes_means_BLUEs.csv")
+MARKER_FILE <- file.path("..", "..", "data", "AUSPAK_test_subset_1k.raw")
+PHENO_FILE  <- file.path("..", "..", "data", "AUSPAK_phenotypes_GP_input.csv")
 
 # Pre-load data once for all tests (expensive to repeat)
 test_dat <- NULL
@@ -20,7 +20,7 @@ setup_test_data <- function() {
   tmpdir <- tempdir()
   kcp <- file.path(tmpdir, "test_fit_kernels.RData")
 
-  dat <- load_and_prepare_data("PtHt_blue", MARKER_FILE,
+  dat <- load_and_prepare_data("PtHt", MARKER_FILE,
                                 pheno_file = PHENO_FILE,
                                 kernel_checkpoint = kcp)
 
@@ -62,7 +62,7 @@ test_that("BGLR RKHS errors when groups argument is passed", {
 
   Z_fix  <- build_fixed_design(model_data$location, model_data$year)
   groups <- build_groups(model_data$location_year)
-  y <- model_data[["PtHt_blue"]]
+  y <- model_data[["PtHt"]]
 
   ETA <- list(
     list(X = Z_fix,         model = "FIXED"),
@@ -95,7 +95,7 @@ test_that("fit_rkhs_and_predict works without groups (fixed code)", {
 
   pred <- fit_rkhs_and_predict(
     model_data  = model_data,
-    trait       = "PtHt_blue",
+    trait       = "PtHt",
     K_geno_list = dat$K_geno_list,
     nIter = NITER, burnIn = BURNIN, thin = THIN,
     saveAt = paste0(tempdir(), "/test_nogroups_")
@@ -119,7 +119,7 @@ test_that("BGLR RKHS without groups produces valid predictions", {
   })
 
   Z_fix  <- build_fixed_design(model_data$location, model_data$year)
-  y <- model_data[["PtHt_blue"]]
+  y <- model_data[["PtHt"]]
 
   ETA <- list(
     list(X = Z_fix,         model = "FIXED"),
@@ -156,7 +156,7 @@ test_that("fit_rkhs_and_predict returns correct columns", {
 
   pred <- fit_rkhs_and_predict(
     model_data  = model_data,
-    trait       = "PtHt_blue",
+    trait       = "PtHt",
     K_geno_list = dat$K_geno_list,
     nIter = NITER, burnIn = BURNIN, thin = THIN,
     saveAt = paste0(tempdir(), "/test_cols_")
@@ -176,11 +176,11 @@ test_that("predictions exist for both training and test (NA) rows", {
   # Mask some rows
   set.seed(42)
   mask_rows <- sample(1:n_rows, min(40, n_rows %/% 3))
-  model_data[["PtHt_blue"]][mask_rows] <- NA
+  model_data[["PtHt"]][mask_rows] <- NA
 
   pred <- fit_rkhs_and_predict(
     model_data  = model_data,
-    trait       = "PtHt_blue",
+    trait       = "PtHt",
     K_geno_list = dat$K_geno_list,
     nIter = NITER, burnIn = BURNIN, thin = THIN,
     saveAt = paste0(tempdir(), "/test_mask_")
@@ -208,7 +208,7 @@ test_that("kernel variance components are non-negative for real data", {
   })
 
   Z_fix <- build_fixed_design(model_data$location, model_data$year)
-  y <- model_data[["PtHt_blue"]]
+  y <- model_data[["PtHt"]]
 
   ETA <- list(
     list(X = Z_fix,         model = "FIXED"),
@@ -242,12 +242,12 @@ test_that("fit_rkhs_and_predict returns NULL when training data too small", {
 
   # Set most values to NA so < 50 training observations remain
   n <- nrow(model_data)
-  model_data[["PtHt_blue"]][1:(n - 5)] <- NA
+  model_data[["PtHt"]][1:(n - 5)] <- NA
 
   expect_warning(
     pred <- fit_rkhs_and_predict(
       model_data  = model_data,
-      trait       = "PtHt_blue",
+      trait       = "PtHt",
       K_geno_list = dat$K_geno_list,
       nIter = NITER, burnIn = BURNIN, thin = THIN,
       saveAt = paste0(tempdir(), "/test_small_")
@@ -268,7 +268,7 @@ test_that("BGLR temp files are cleaned up after fitting", {
 
   pred <- fit_rkhs_and_predict(
     model_data  = model_data,
-    trait       = "PtHt_blue",
+    trait       = "PtHt",
     K_geno_list = dat$K_geno_list,
     nIter = NITER, burnIn = BURNIN, thin = THIN,
     saveAt = saveAt

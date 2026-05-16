@@ -32,10 +32,10 @@ library(asreml)
 
 # ── Global constants ─────────────────────────────────────────────────────────
 
-VALID_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue', 'PcleLng_blue',
-                  'SdLen_blue', 'TGW_blue', 'SdW_z_blue')
+VALID_TRAITS <- c('DTF', 'DTH', 'PtHt', 'PcleLng',
+                  'SdLen', 'TGW', 'SdW_z')
 
-LOWER_IS_BETTER_TRAITS <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
+LOWER_IS_BETTER_TRAITS <- c('DTF', 'DTH', 'PtHt')
 
 # ── NDCG@k calculation ──────────────────────────────────────────────────────
 
@@ -159,6 +159,20 @@ align_genotypes_to_gmatrix <- function(pheno_data, Ginv_sparse) {
 # All factor levels remain in the model so ASReml can predict for any
 # location-year combination, including held-out ones.
 # Used by CV0, CV1, and CV2 (not cross-location).
+#
+# Heterogeneous variance structure:
+#   residual = ~ dsum(~ units | location)   — separate residual var per location
+#   random   = ~ vm(sample.id, Ginv_sparse) + at(location):year
+#                                          — separate year-within-location var
+#                                            for each location
+#
+# dsum requires data sorted by the sectioning factor (location), so we sort
+# inside this function before fitting.
+#
+# Returns a list:
+#   pred_values — data.frame of predicted values per sample.id × location × year
+#   varcomp     — data.frame of variance components from summary(model)$varcomp,
+#                 with the rownames as a `component_name` column
 
 fit_gblup_and_predict <- function(model_data, trait, Ginv_sparse) {
 
@@ -168,11 +182,14 @@ fit_gblup_and_predict <- function(model_data, trait, Ginv_sparse) {
     return(NULL)
   }
 
+  # dsum() in the residual term requires data sorted by the sectioning factor
+  model_data <- model_data[order(as.character(model_data$location)), ]
+
   model <- tryCatch({
     asreml(
       fixed = as.formula(paste(trait, "~ location")),
-      random = ~ vm(sample.id, Ginv_sparse) + location:year,
-      residual = ~ units,
+      random = ~ vm(sample.id, Ginv_sparse) + at(location):year,
+      residual = ~ dsum(~ units | location),
       na.action = na.method(y = "include"),
       workspace = 256e06,
       data = model_data,
@@ -216,7 +233,19 @@ fit_gblup_and_predict <- function(model_data, trait, Ginv_sparse) {
   real_lys <- unique(as.character(model_data$location_year))
   pred_values <- pred_values[pred_values$location_year %in% real_lys, ]
 
-  return(pred_values)
+  vc <- summary(model)$varcomp
+  varcomp_df <- data.frame(
+    component_name = rownames(vc),
+    vc,
+    row.names = NULL,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+
+  return(list(
+    pred_values = pred_values,
+    varcomp = varcomp_df
+  ))
 }
 
 # ── Evaluate per location-year ───────────────────────────────────────────────

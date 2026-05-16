@@ -1,6 +1,6 @@
 # Genomic Prediction in Quinoa: Comparing Statistical and Machine Learning Approaches
 
-This repository contains code for multi-environment genomic prediction in quinoa (*Chenopodium quinoa*), comparing three statistical genetics methods (GBLUP, BayesC, RKHS) and a machine learning approach (LightGBM) across four cross-validation schemes.
+This repository contains code for multi-environment genomic prediction in quinoa (*Chenopodium quinoa*), comparing three statistical genetics methods (GBLUP, BayesC, RKHS) and a machine-learning approach (LightGBM) across four cross-validation schemes.
 
 ## Overview
 
@@ -10,16 +10,16 @@ Genomic prediction was evaluated for 7 agronomic traits in 551 quinoa accessions
 
 | Model | Package | Approach |
 |-------|---------|----------|
-| **GBLUP** | ASReml-R | Mixed model with genomic relationship matrix (VanRaden); location:year as random effect |
+| **GBLUP** | ASReml-R | Mixed model with VanRaden genomic relationship matrix; heterogeneous residual variance per location; location-specific year effects. Also fit per-location (within each location independently) to benchmark and estimate location-specific variance components. |
 | **BayesC** | BGLR | Bayesian SNP regression with spike-and-slab prior; explicit marker effects |
 | **RKHS** | BGLR | Bayesian kernel regression with Gaussian kernels at 3 bandwidths (kernel averaging) |
-| **LightGBM** | LightGBM | Gradient boosting on principal components or kinship features; per-trait hyperparameter tuning |
+| **LightGBM** | LightGBM | Gradient boosting on kinship features + one-hot-encoded environments; per-trait hyperparameter tuning |
 
 **Cross-validation schemes:**
 
 | Scheme | What it tests | Design |
 |--------|---------------|--------|
-| **CV1** | Predicting **new genotypes** in known environments | 5-fold GroupKFold on genotypes, 15 iterations |
+| **CV1** | Predicting **new genotypes** in known environments | 5-fold on genotypes, 15 iterations |
 | **CV2** | **Sparse testing** — random cells masked | 5-fold stratified by location-year, 15 iterations |
 | **CV0** | **Leave-one-location-year-out** | Deterministic, entire environments held out |
 | **CrossLoc** | **Cross-location transfer** | Train on one location, predict the other |
@@ -35,75 +35,53 @@ All models use the same fold assignments, seeds, preprocessing (z-score standard
 │   ├── SNPfiltering_for_AUSPAK_samples.sh   # VCF quality filtering (bcftools)
 │   ├── prepare_marker_matrices.sh           # LD pruning + PLINK export
 │   ├── Kinship_matrix.R                     # VanRaden kinship matrix (AGHmatrix)
-│   ├── PCA.R                               # Principal components (SNPRelate)
-│   └── BLUEs.ipynb                          # Phenotype processing (BLUEs)
+│   ├── build_GP_phenotype_input.R           # Builds AUSPAK_phenotypes_GP_input.csv (per-location means)
+│   └── BLUEs/                               # Per-location BLUEs for visualisation only (asreml-R)
 │
 ├── data/
-│   ├── AUSPAK_phenotypes_means_BLUEs.csv              # Phenotypes (BLUEs)
-│   ├── AUSPAK_PCs_all.csv                             # 551 principal components
+│   ├── AUSPAK_phenotypes_GP_input.csv             # Phenotypes for genomic prediction (per-location means)
+│   ├── AUSPAK_BLUEs_for_phenotype_plots.csv       # Per-location BLUEs for phenotype-correlation plots
 │   ├── kinship_matrix_VanRaden_auspak_maxmissing20.csv    # Kinship matrix (CSV)
 │   ├── kinship_matrix_VanRaden_auspak_maxmissing20.RData  # Kinship matrix (RData)
-│   ├── pruned05_AUSPAK_for_bayesC.raw                 # LD-pruned markers for BayesC (PLINK .raw)
-│   ├── auspak_for_rkhs.raw                            # Full markers for RKHS (PLINK .raw)
-│   └── AUSPAK_test_subset_1k.raw                      # 1000-marker test subset (551 genotypes)
+│   ├── pruned05_AUSPAK_for_bayesC.raw       # LD-pruned markers for BayesC (PLINK .raw)
+│   ├── auspak_for_rkhs.raw                  # Full markers for RKHS (PLINK .raw)
+│   └── AUSPAK_test_subset_1k.raw            # 1000-marker test subset (551 genotypes)
 │
 ├── models/
-│   ├── GBLUP/                   # ASReml-R GBLUP pipeline
-│   │   ├── G_matrix_GBLUP.R         # G matrix preparation (bend + invert)
-│   │   ├── GBLUP_utils.R            # Shared utilities
-│   │   └── GBLUP.R                  # All CV schemes in one script
-│   │
-│   ├── BayesC/                  # BGLR BayesC pipeline
-│   │   ├── BayesC_utils.R           # Shared utilities
-│   │   ├── BayesC_CV1_single_iter.R # CV1 (one iteration per SLURM job)
-│   │   ├── BayesC_CV2_single_iter.R # CV2 (one iteration per SLURM job)
-│   │   ├── BayesC_CV0.R             # CV0 (deterministic)
-│   │   ├── BayesC_CrossLoc.R        # Cross-location prediction
-│   │   ├── launch_BayesC_jobs.sh    # SLURM job generation/submission
-│   │   └── aggregate_BayesC_results.R
-│   │
-│   ├── RKHS/                    # BGLR RKHS kernel averaging pipeline
-│   │   ├── RKHS_utils.R             # Shared utilities + kernel computation
-│   │   ├── RKHS_CV1.R               # CV1 (all iterations per SLURM job)
-│   │   ├── RKHS_CV2.R               # CV2 (all iterations per SLURM job)
-│   │   ├── RKHS_CV0_CrossLoc.R      # CV0 + CrossLoc combined
-│   │   ├── launch_RKHS_jobs.sh      # SLURM job generation/submission
-│   │   └── aggregate_RKHS_results.R
-│   │
-│   ├── LightGBM/               # LightGBM gradient boosting pipeline
-│   │   ├── Prepare_input_data.py    # Data preparation (3 pickle variants)
-│   │   ├── tune_LightGBM.py         # Hyperparameter tuning (RandomizedSearchCV)
-│   │   ├── LightGBM_utils.py        # Shared utilities
-│   │   ├── run_LightGBM.py          # All CV schemes in one script
-│   │   └── environment_ml.yml       # Conda environment specification
-│   │
-│   └── tests/                  # Unit + integration tests (R and Python)
-│       ├── test_cv_fold_assignment.R     # Cross-model fold assignment tests
-│       ├── test_*.R                      # Per-model R tests (BayesC, RKHS, GBLUP)
-│       └── test_*.py                     # LightGBM Python tests
+│   ├── GBLUP/        # ASReml-R GBLUP (global + per-location)
+│   ├── BayesC/       # BGLR BayesC
+│   ├── RKHS/         # BGLR RKHS kernel averaging
+│   ├── LightGBM/     # LightGBM gradient boosting (kinship features)
+│   └── tests/        # Unit + integration tests (R + Python)
 │
-└── results/
-    ├── combine_all_models.R         # Merge per-model results into unified CSVs
-    ├── visualize_results.py         # Generate comparison figures (PDF)
-    ├── cv_results_all_models.csv    # Combined accuracy metrics across all models
-    └── cv_summary_all_models.csv    # Summary statistics across all models
+└── visualizations_results/
+    ├── combine_all_models.R                       # Merge per-model results into unified CSVs
+    ├── Manuscript_Figures.ipynb                   # Notebook producing every manuscript figure
+    ├── cv_results_all_models.csv                  # Combined accuracy metrics across all models (global CV1/CV2/CV0/CrossLoc)
+    ├── cv_results_cv1_per-location-model.csv     # Per-location GBLUP CV1 accuracies
+    └── Figure1.png … Figure7.png, FigureS1.png    # Rendered manuscript figures
 ```
+
+Each model directory has a `README.md` with the implementation details, file inventory, and usage commands specific to that pipeline.
 
 ## Data
 
 ### Phenotypic Traits
 
-All traits are Best Linear Unbiased Estimates (BLUEs):
+Input data for the genomic prediction models consist of location-level phenotypic means (`AUSPAK_phenotypes_GP_input.csv`), not BLUEs. Trial-level means were used instead of BLUEs to retain environment-specific information for cross-validation. Owing to the largely unreplicated trial structure — with formal replication present only within one of the six location-year environments — insufficient information was available to estimate reliable within-environment BLUEs. Even in the trial containing two replicates, BLUEs provided a limited advantage over unadjusted means in the absence of additional covariates.
+
+Per-location BLUEs (`AUSPAK_BLUEs_for_phenotype_plots.csv`), produced by the scripts in `preprocessing/BLUEs/`, are kept for visualisation only (e.g. trait correlation plots).
 
 | Code | Trait | Direction |
 |------|-------|-----------|
-| DTF | Days to flowering | Lower is better |
-| DTH | Days to harvest maturity | Lower is better |
-| PtHt | Plant height (cm) | Lower is better |
-| PcleLng | Panicle length (cm) | Higher is better |
-| SdLen | Seed length (mm) | Higher is better |
-| TGW | Thousand grain weight (g) | Higher is better |
-| SdW_z | Seed yield (z-transformed) | Higher is better |
+| `DTF` | Days to flowering | Lower is better |
+| `DTH` | Days to harvest maturity | Lower is better |
+| `PtHt` | Plant height (cm) | Lower is better |
+| `PcleLng` | Panicle length (cm) | Higher is better |
+| `SdLen` | Seed length (mm) | Higher is better |
+| `TGW` | Thousand grain weight (g) | Higher is better |
+| `SdW_z` | Seed yield (z-transformed) | Higher is better |
+
 
 ### Environments
 
@@ -112,96 +90,100 @@ All traits are Best Linear Unbiased Estimates (BLUEs):
 | AUS (Kununurra, Australia) | 2017, 2018, 2019 | AUS_2017, AUS_2018, AUS_2019 |
 | PAK (Faisalabad, Pakistan) | 2019-20, 2020-21, 2021-22 | PAK_2019, PAK_2020, PAK_2021 |
 
-551 quinoa accessions total. Not all genotypes appear in all location-years; not all traits are observed for every genotype x location-year combination.
+551 quinoa accessions total. Not all genotypes appear in all location-years; not all traits are observed for every genotype × location-year combination.
 
 ### Genotypic Data
 
-- 18 nuclear chromosomes (9 homeologous pairs: Cq1A-Cq9A, Cq1B-Cq9B)
-- 1,824,377 biallelic SNPs after quality filtering (MAF >= 0.01, <20% missing, depth 5-30x)
-- LD pruning (PLINK2, r² < 0.5, window 50, step 5) retains ~557k markers for BayesC; RKHS and GBLUP use the full marker set
-- Kinship matrix: VanRaden method 1 (AGHmatrix)
-- PCA: 551 principal components (SNPRelate)
+- 18 nuclear chromosomes (9 homeologous pairs: Cq1A–Cq9A, Cq1B–Cq9B)
+- 1,824,377 biallelic SNPs after quality filtering (MAF ≥ 0.01, < 20% missing, depth 5–30×)
+- LD pruning (PLINK2, r² < 0.5, window 50, step 5) retains ~557k markers — used **only for BayesC**; RKHS uses the full 1,824,377-SNP quality-filtered set
+- Kinship matrix: VanRaden method 1 (AGHmatrix), built from the **full quality-filtered SNP set** (not the LD-pruned subset) — used by GBLUP (as G-inverse) and LightGBM (as kinship features)
 
 ## Models
 
 ### GBLUP
 
-Mixed model using ASReml-R with a pre-computed genomic relationship matrix:
+Mixed model using ASReml-R with a pre-computed genomic relationship matrix. Two variants:
 
-- **Fixed**: location
-- **Random**: `vm(sample.id, Ginv_sparse)` (genomic BLUPs) + `location:year`
-- G matrix is bent for positive definiteness and inverted to sparse triplet format (ASRgenomics)
-- CrossLoc variant uses intercept-only fixed effects (`trait ~ 1 + G`)
-- Runs locally (no SLURM needed)
+- **Global model** (pooled across both locations) — `fixed = ~ location`, `random = vm(sample.id, G) + at(location):year` (location-specific year variance components), `residual = dsum(~ units | location)` (heterogeneous residual variance per location). Used for CV1, CV2, CV0. The CrossLoc variant uses an intercept-only fixed effect with `~ units` residual since `dsum`/`at(location)` collapse to homogeneous within a single location.
+- **Per-location model** — fit independently within each location: `fixed = ~ 1`, `random = vm(sample.id, G) + year`, `residual = ~ units`. Used to benchmark within-location vs. global prediction accuracy and to estimate location-specific genetic variance components. Heterogeneous residual variances across years are not modelled at the per-location scale due to convergence failures (2–3 years per location, no within-year replication, year already random).
+
+Runs locally (no SLURM). See `models/GBLUP/README.md`.
 
 ### BayesC
 
 Bayesian SNP regression via BGLR with a spike-and-slab prior:
 
-- **Fixed**: location + year-within-location (as fixed effects, since BGLR lacks random effects)
+- **Fixed**: location + year-within-location (BGLR lacks random effects, so these are fitted as fixed)
 - **Marker effects**: BayesC prior (some markers shrunk to zero)
 - MCMC: 15,000 iterations, 5,000 burn-in, thinning every 5
 - Distributed via SLURM (one job per trait per iteration for CV1/CV2)
+
+See `models/BayesC/README.md`.
 
 ### RKHS
 
 Reproducing Kernel Hilbert Space regression via BGLR with Gaussian kernel averaging:
 
 - **Fixed**: location + year-within-location (same as BayesC)
-- **Kernels**: 3 Gaussian kernels at different bandwidths (`h = 1/5, 1, 5` x `1/median(D)`)
+- **Kernels**: 3 Gaussian kernels at different bandwidths (`h = 1/5, 1, 5` × `1/median(D)`)
 - BGLR estimates variance components per kernel (Bayesian kernel averaging)
 - Non-parametric: predicts through genomic similarity, not individual marker effects
 - Distributed via SLURM (one job per trait)
 
+See `models/RKHS/README.md`.
+
 ### LightGBM
 
-Gradient boosting with per-trait hyperparameter tuning:
+Gradient boosting on the kinship matrix:
 
-- **Features**: genetic features (PCs or kinship columns) + one-hot encoded location and location-year
-- Three input variants: all 551 PCs, 25 PCs, or kinship matrix columns
-- Hyperparameters tuned via `RandomizedSearchCV` (50 combinations, 5-fold GroupKFold)
-- CrossLoc uses genetic features only (no location encoding)
-- Runs locally (no SLURM needed)
+- **Features**: kinship matrix columns (`K_*`) + one-hot-encoded `location` and `location_year` (CrossLoc uses kinship only)
+- **Hyperparameters**: tuned per trait via `RandomizedSearchCV` (50 combinations, 5-fold GroupKFold)
+- Runs locally (no SLURM)
+
+See `models/LightGBM/README.md`.
 
 ## Preprocessing
 
-All preprocessing scripts are in `preprocessing/`. These must be run before the prediction models.
+All preprocessing scripts are in `preprocessing/`. Run before the prediction models. See `preprocessing/README.md` for full details.
 
-### 1. SNP Filtering
+### 1. SNP filtering
 
-Quality filtering of the raw VCF (bcftools):
+`SNPfiltering_for_AUSPAK_samples.sh` (bcftools, SLURM script) subsets the master VCF to the 551 AUS/PAK accessions and applies variant QC:
 
-- Nuclear chromosomes only (excludes organellar genomes)
+- Nuclear chromosomes only (`Cq1A–Cq9B`; excludes organellar genomes)
 - Biallelic SNPs only
-- MAF >= 0.01
+- MAF ≥ 0.01
 - Missing data < 20% per variant
-- Mean depth 5-30x (excludes low coverage and likely paralogs)
+- Mean depth 5–30× (excludes low coverage and likely paralogs)
 
 **Output:** `quinoa_551accessions_genomic_prediction.vcf` (1,824,377 SNPs, 551 accessions)
 
-### 2. Marker Matrix Export and LD Pruning
+### 2. Marker matrix export and LD pruning
 
-`prepare_marker_matrices.sh` (PLINK2) exports marker data in three forms:
+`prepare_marker_matrices.sh` (PLINK2) exports the filtered VCF as three mean-imputed `.raw` matrices. Variant IDs are reassigned to `chr:pos:ref:alt` to ensure no duplicate IDs. **LD pruning is applied only to the BayesC input**; RKHS and the kinship matrix use the full quality-filtered SNP set.
 
 | Output file | Description | Used by |
 |-------------|-------------|---------|
-| `auspak_for_rkhs.raw` | Full marker set (1,824,377 SNPs) | RKHS |
-| `pruned05_AUSPAK_for_bayesC.raw` | LD-pruned (r² < 0.5, ~557k markers) | BayesC |
-| `AUSPAK_test_subset_1k.raw` | 1,000 random markers from pruned set | Tests |
+| `auspak_for_rkhs.raw` | Full quality-filtered marker set (1,824,377 SNPs) | RKHS |
+| `pruned05_AUSPAK_for_bayesC.raw` | LD-pruned subset of the full set (`--indep-pairwise 50 5 0.5`, ~557k markers) | BayesC |
+| `AUSPAK_test_subset_1k.raw` | 1,000 random markers from the pruned set | Tests |
 
-### 3. Kinship Matrix
+### 3. Kinship matrix
 
-`Kinship_matrix.R` computes the VanRaden method 1 additive relationship matrix from the full VCF using AGHmatrix. Used by GBLUP (via G-inverse) and LightGBM (as kinship features).
+`Kinship_matrix.R` computes the VanRaden method 1 additive relationship matrix from the **full quality-filtered VCF** (not the LD-pruned subset) using `AGHmatrix::Gmatrix`. Used by GBLUP (as the G matrix) and LightGBM (as kinship features).
 
-### 4. Principal Component Analysis
+**Output:** `kinship_matrix_VanRaden_auspak_maxmissing20.RData`
 
-`PCA.R` computes all 551 principal components from the full marker set using SNPRelate. Used by LightGBM as an alternative feature set.
+### 4. Phenotype input
 
-### 5. Phenotype Processing (BLUEs)
+`build_GP_phenotype_input.R` produces `AUSPAK_phenotypes_GP_input.csv` — per-location per-accession means across all trials, in wide format (one row per location-year-accession, one column per trait). This is the input file consumed by every genomic prediction model. Raw means are used uniformly across all six location-years: five trials are unreplicated and the only replicated trial (PAK 2021-22) yields BLUEs essentially equal to means in the absence of spatial covariates.
 
-`BLUEs.ipynb` estimates Best Linear Unbiased Estimates for each trait using ASReml-R, accounting for year and replicate effects. Outputs `AUSPAK_phenotypes_means_BLUEs.csv`.
+### 5. Per-location BLUEs (visualisation only)
 
-### 6. Z-score Standardisation (within models)
+`preprocessing/BLUEs/` fits per-location BLUEs (asreml-R) for phenotype-correlation plots and descriptive summaries — **not** consumed by any GP model. `BLUEs_AUS.R` and `BLUEs_PAK.R` fit per-location-year mixed models; `merge_BLUEs_for_phenotype_plots.R` merges them into `AUSPAK_BLUEs_for_phenotype_plots.csv`.
+
+### 6. Z-score standardisation (within models)
 
 All models standardise each trait within each location-year before fitting:
 
@@ -209,16 +191,17 @@ All models standardise each trait within each location-year before fitting:
 z_ijl = (y_ijl - mean_l) / sd_l
 ```
 
-This removes environmental mean differences so that prediction accuracy reflects the ability to rank genotypes within environments, not to predict absolute trait values.
+This removes environmental mean differences so prediction accuracy reflects the ability to rank genotypes within environments, not to predict absolute trait values.
 
 ## Evaluation Metrics
 
 All predictions are evaluated **per location-year** using:
 
 - **Pearson correlation** — linear predictive accuracy
+- **Spearman rank correlation** — rank-based predictive accuracy
 - **NDCG@10** — normalised discounted cumulative gain at top 10, reflecting selection ranking quality at ~20% selection intensity
 
-Trait directionality is accounted for (e.g., for DTF, lower values are ranked higher in NDCG).
+Trait directionality is accounted for (e.g., for DTF lower values are ranked higher in NDCG).
 
 ## Usage
 
@@ -226,11 +209,16 @@ Trait directionality is accounted for (e.g., for DTF, lower values are ranked hi
 
 ```bash
 cd preprocessing
-bash SNPfiltering_for_AUSPAK_samples.sh    # Quality filter VCF
+bash SNPfiltering_for_AUSPAK_samples.sh    # Quality filter VCF (SLURM)
 bash prepare_marker_matrices.sh            # LD pruning + PLINK export
 Rscript Kinship_matrix.R                   # Kinship matrix
-Rscript PCA.R                              # Principal components
-# Run BLUEs.ipynb in R/Jupyter             # Phenotype BLUEs
+Rscript build_GP_phenotype_input.R         # Per-location means → AUSPAK_phenotypes_GP_input.csv
+
+# (optional) Per-location BLUEs for visualisation only
+cd BLUEs
+Rscript BLUEs_AUS.R
+Rscript BLUEs_PAK.R
+Rscript merge_BLUEs_for_phenotype_plots.R
 ```
 
 ### R models (GBLUP, BayesC, RKHS)
@@ -238,8 +226,9 @@ Rscript PCA.R                              # Principal components
 ```bash
 # GBLUP — run locally
 cd models/GBLUP
-Rscript G_matrix_GBLUP.R          # Prepare G-inverse (once)
-Rscript GBLUP.R                   # Run all CV schemes
+Rscript G_matrix_GBLUP.R              # Prepare G-inverse (once)
+Rscript GBLUP.R                       # Global CV pipeline (all four schemes)
+Rscript GBLUP_per_location_CV1.R      # Per-location CV1 + variance components
 
 # BayesC — SLURM cluster
 cd models/BayesC
@@ -259,18 +248,20 @@ cd models/LightGBM
 conda env create --file environment_ml.yml --prefix ./env-ML
 conda activate ./env-ML
 
-python Prepare_input_data.py       # Prepare pickles (once)
-python tune_LightGBM.py            # Tune hyperparameters (once per input type)
+python Prepare_input_data.py       # Build model_inputs/model_input.pkl (once)
+python tune_LightGBM.py            # Tune hyperparameters (once)
 python run_LightGBM.py             # Run all CV schemes
 ```
 
 ### Combine results and visualise
 
 ```bash
-cd results
-Rscript combine_all_models.R       # Merge all model results
-python visualize_results.py        # Generate comparison figures (PDF)
+cd visualizations_results
+Rscript combine_all_models.R       # Merge all model results → cv_results_all_models.csv
+jupyter notebook Manuscript_Figures.ipynb   # Reproduce every manuscript figure (Figure1–7, FigureS1)
 ```
+
+All code used to generate the manuscript figures lives in `Manuscript_Figures.ipynb`; the rendered figures (`Figure1.png` … `FigureS1.png`) are committed alongside it.
 
 ## Tests
 
@@ -287,7 +278,7 @@ conda activate ../LightGBM/env-ML
 pytest . -v
 ```
 
-Tests cover fold assignment consistency, evaluation metrics, data loading, per-location-year evaluation, and end-to-end CV pipeline integration.
+Tests cover fold assignment consistency, evaluation metrics, data loading, per-location-year evaluation, and end-to-end CV pipeline integration. See `models/tests/README.md` for the inventory.
 
 ## Requirements
 
@@ -298,10 +289,9 @@ Tests cover fold assignment consistency, evaluation metrics, data loading, per-l
 
 ### R packages
 
-- `asreml` (requires license) + `ASRgenomics` — GBLUP and BLUEs
+- `asreml` (requires license) + `ASRgenomics` — GBLUP (and the optional `preprocessing/BLUEs/` pipeline)
 - `BGLR` — BayesC, RKHS
 - `AGHmatrix` — kinship matrix
-- `SNPRelate` — PCA
 - `dplyr`, `data.table`, `Matrix` — data handling
 - `testthat` — testing
 
@@ -316,9 +306,6 @@ See `models/LightGBM/environment_ml.yml`:
 
 If you use this code or data, please cite: (Manuscript currently under review)
 
-
-
 ## Contact
 
 clara.stanschewski@kaust.edu.sa
-

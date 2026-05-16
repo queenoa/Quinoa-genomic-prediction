@@ -2,7 +2,7 @@ library(testthat)
 
 # Source from GBLUP_utils.R to verify the shared copies are correct
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "GBLUP", "GBLUP_utils.R"))
+  source(file.path("..", "GBLUP", "GBLUP_utils.R"))
 )
 
 # ============================================================================
@@ -10,13 +10,13 @@ suppressPackageStartupMessages(
 # ============================================================================
 
 test_that("VALID_TRAITS matches BayesC/RKHS", {
-  expected <- c('DTF_blue', 'DTH_blue', 'PtHt_blue', 'PcleLng_blue',
-                'SdLen_blue', 'TGW_blue', 'SdW_z_blue')
+  expected <- c('DTF', 'DTH', 'PtHt', 'PcleLng',
+                'SdLen', 'TGW', 'SdW_z')
   expect_equal(VALID_TRAITS, expected)
 })
 
 test_that("LOWER_IS_BETTER_TRAITS matches BayesC/RKHS", {
-  expected <- c('DTF_blue', 'DTH_blue', 'PtHt_blue')
+  expected <- c('DTF', 'DTH', 'PtHt')
   expect_equal(LOWER_IS_BETTER_TRAITS, expected)
 })
 
@@ -123,7 +123,7 @@ test_that("evaluate_predictions returns pearson, spearman, ndcg_at_10", {
   y_true <- rnorm(50)
   y_pred <- y_true + rnorm(50, sd = 0.3)
 
-  res <- evaluate_predictions(y_true, y_pred, trait_name = "DTF_blue")
+  res <- evaluate_predictions(y_true, y_pred, trait_name = "DTF")
 
   expect_true(is.list(res))
   expect_named(res, c("pearson", "spearman", "ndcg_at_10"))
@@ -143,10 +143,10 @@ test_that("evaluate_predictions uses lower_is_better for NDCG", {
   y_true <- c(1, 2, 3, 4, 5)
   y_pred <- c(1, 2, 3, 4, 5)
 
-  # DTF_blue is in LOWER_IS_BETTER_TRAITS
-  res_lower <- evaluate_predictions(y_true, y_pred, trait_name = "DTF_blue")
-  # SdW_z_blue is NOT in LOWER_IS_BETTER_TRAITS
-  res_higher <- evaluate_predictions(y_true, y_pred, trait_name = "SdW_z_blue")
+  # DTF is in LOWER_IS_BETTER_TRAITS
+  res_lower <- evaluate_predictions(y_true, y_pred, trait_name = "DTF")
+  # SdW_z is NOT in LOWER_IS_BETTER_TRAITS
+  res_higher <- evaluate_predictions(y_true, y_pred, trait_name = "SdW_z")
 
   # Both should have NDCG = 1 since prediction matches truth perfectly
   expect_equal(res_lower$ndcg_at_10, 1.0)
@@ -159,7 +159,7 @@ test_that("evaluate_predictions uses lower_is_better for NDCG", {
 
 test_that("summarise_cv_results returns correct columns", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     location_year = rep(c("AUS_2019", "AUS_2020"), each = 2),
     location = rep("AUS", 4),
     pearson = c(0.5, 0.6, 0.7, 0.8),
@@ -195,7 +195,7 @@ test_that("summarise_cv_results warns on empty input", {
 
 test_that("summarise_cv_results groups by trait and location", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     location_year = c("AUS_2019", "AUS_2020", "PAK_2019", "PAK_2020"),
     location = c("AUS", "AUS", "PAK", "PAK"),
     pearson = c(0.5, 0.6, 0.3, 0.4),
@@ -217,7 +217,7 @@ test_that("summarise_cv_results groups by trait and location", {
 
 test_that("summarise_cv_results calculates correct statistics", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     location_year = paste0("AUS_", 2019:2022),
     location = rep("AUS", 4),
     pearson = c(0.4, 0.6, 0.8, 1.0),

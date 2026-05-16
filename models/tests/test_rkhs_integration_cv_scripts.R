@@ -4,12 +4,20 @@ library(testthat)
 # Runs each script end-to-end with 1k-marker test data and minimal MCMC.
 # These tests take ~2-5 minutes total due to BGLR fitting.
 
-MODELS_DIR  <- normalizePath(file.path("..", "models", "RKHS"))
-MARKER_FILE <- normalizePath(file.path("..", "data", "AUSPAK_test_subset_1k.raw"))
-PHENO_FILE  <- normalizePath(file.path("..", "data", "AUSPAK_phenotypes_means_BLUEs.csv"))
+MODELS_DIR  <- normalizePath(file.path("..", "RKHS"))
+MARKER_FILE <- normalizePath(file.path("..", "..", "data", "AUSPAK_test_subset_1k.raw"))
+PHENO_FILE  <- normalizePath(file.path("..", "..", "data", "AUSPAK_phenotypes_GP_input.csv"))
 
-# Use a temp directory for all output files
-OUTDIR <- file.path(tempdir(), "rkhs_integration_tests")
+# The RKHS scripts source RKHS_utils.R from the CWD, which expects the
+# phenotype file at "../AUSPAK_phenotypes_GP_input.csv" by default. We
+# therefore lay out a parent/working-dir pair so the default path resolves:
+#
+#   PARENT_DIR/                                  (== OUTDIR/..)
+#   ├── AUSPAK_phenotypes_GP_input.csv           (matches default)
+#   └── work/                                    (== OUTDIR; CWD when the
+#       └── (RKHS_utils.R, output CSVs)           RKHS script runs)
+PARENT_DIR <- file.path(tempdir(), "rkhs_integration_root")
+OUTDIR     <- file.path(PARENT_DIR, "work")
 dir.create(OUTDIR, showWarnings = FALSE, recursive = TRUE)
 
 # Environment variables for fast MCMC and single iteration
@@ -21,7 +29,12 @@ MCMC_ENV <- c(
 )
 
 # Test trait — use one with data in most location-years
-TEST_TRAIT <- "PtHt_blue"
+TEST_TRAIT <- "PtHt"
+
+# Place phenotype CSV where the RKHS default expects to find it
+file.copy(PHENO_FILE,
+          file.path(PARENT_DIR, "AUSPAK_phenotypes_GP_input.csv"),
+          overwrite = TRUE)
 
 # Helper: run an Rscript in OUTDIR with fast MCMC settings
 run_cv_script <- function(script_name, args) {
@@ -46,10 +59,6 @@ run_cv_script <- function(script_name, args) {
 test_that("CV1 script runs and produces expected output files", {
   old_wd <- setwd(OUTDIR)
   on.exit(setwd(old_wd))
-
-  # Copy phenotype file so default path works
-  file.copy(PHENO_FILE, file.path(OUTDIR, "AUSPAK_phenotypes_means_BLUEs.csv"),
-            overwrite = TRUE)
 
   status <- run_cv_script("RKHS_CV1.R", c(TEST_TRAIT, MARKER_FILE))
 
@@ -398,6 +407,6 @@ test_that("CV2 predictions have reasonable variance (not constant)", {
 
 # Clean up temp directory
 test_that("cleanup", {
-  unlink(OUTDIR, recursive = TRUE)
+  unlink(PARENT_DIR, recursive = TRUE)
   expect_true(TRUE)
 })

@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "RKHS", "RKHS_utils.R"))
+  source(file.path("..", "RKHS", "RKHS_utils.R"))
 )
 
 # ── Synthetic marker matrix for kernel tests ─────────────────────────────────

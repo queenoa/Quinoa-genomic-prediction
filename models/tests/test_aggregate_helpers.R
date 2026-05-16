@@ -1,7 +1,7 @@
 library(testthat)
 
 suppressPackageStartupMessages(
-  source(file.path("..", "models", "BayesC", "aggregate_BayesC_results.R"))
+  source(file.path("..", "BayesC", "aggregate_BayesC_results.R"))
 )
 
 # ── collect_csvs ─────────────────────────────────────────────────────────────
@@ -17,8 +17,8 @@ test_that("collect_csvs reads and combines matching CSVs", {
   old_wd <- setwd(tmpdir)
   on.exit(setwd(old_wd))
 
-  df1 <- data.frame(trait = "DTF_blue", pearson = 0.5, stringsAsFactors = FALSE)
-  df2 <- data.frame(trait = "DTF_blue", pearson = 0.7, stringsAsFactors = FALSE)
+  df1 <- data.frame(trait = "DTF", pearson = 0.5, stringsAsFactors = FALSE)
+  df2 <- data.frame(trait = "DTF", pearson = 0.7, stringsAsFactors = FALSE)
   write.csv(df1, "test_collect_1.csv", row.names = FALSE)
   write.csv(df2, "test_collect_2.csv", row.names = FALSE)
 
@@ -37,8 +37,8 @@ test_that("collect_csvs handles files with different columns via bind_rows", {
   old_wd <- setwd(tmpdir)
   on.exit(setwd(old_wd))
 
-  df1 <- data.frame(trait = "DTF_blue", pearson = 0.5, stringsAsFactors = FALSE)
-  df2 <- data.frame(trait = "DTF_blue", pearson = 0.7, extra = "x",
+  df1 <- data.frame(trait = "DTF", pearson = 0.5, stringsAsFactors = FALSE)
+  df2 <- data.frame(trait = "DTF", pearson = 0.7, extra = "x",
                      stringsAsFactors = FALSE)
   write.csv(df1, "test_mixed_1.csv", row.names = FALSE)
   write.csv(df2, "test_mixed_2.csv", row.names = FALSE)
@@ -70,7 +70,7 @@ test_that("compute_summary returns NULL for empty data frame", {
 
 test_that("compute_summary groups by trait, cv_scheme, location", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 6),
+    trait = rep("DTF", 6),
     cv_scheme = rep(c("CV1", "CV2"), each = 3),
     location = rep("AUS", 6),
     pearson = c(0.5, 0.6, 0.7, 0.3, 0.4, 0.5),
@@ -92,7 +92,7 @@ test_that("compute_summary groups by trait, cv_scheme, location", {
 
 test_that("compute_summary calculates correct mean and sd", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     cv_scheme = rep("CV1", 4),
     location = rep("AUS", 4),
     pearson = c(0.4, 0.6, 0.8, 1.0),
@@ -113,7 +113,7 @@ test_that("compute_summary calculates correct mean and sd", {
 
 test_that("compute_summary separates locations", {
   cv_data <- data.frame(
-    trait = rep("DTF_blue", 4),
+    trait = rep("DTF", 4),
     cv_scheme = rep("CV1", 4),
     location = c("AUS", "AUS", "PAK", "PAK"),
     pearson = c(0.5, 0.6, 0.3, 0.4),
