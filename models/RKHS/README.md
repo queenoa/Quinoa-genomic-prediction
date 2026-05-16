@@ -107,8 +107,3 @@ Identical-logic helpers in `RKHS_utils.R` (mirrored in `BayesC_utils.R` and `GBL
 - `evaluate_predictions()` — Pearson, Spearman, NDCG@10
 - `evaluate_per_location_year()` — index-based (BGLR row-aligned); GBLUP uses a join-based variant
 
-## References
-
-- Perez P, de los Campos G (2014) Genome-wide regression and prediction with the BGLR statistical package. *Genetics* 198:483-495
-- de los Campos G et al. (2010) Semi-parametric genomic-enabled prediction of genetic values. *Genetics Research* 92:295-308
-- Cuevas J et al. (2016) Genomic prediction of genotype × environment interaction kernel regression models. *Plant Genome* 9(3)

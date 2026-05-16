@@ -26,7 +26,6 @@ For cross-location prediction, marker effects are estimated on the source locati
 | `BayesC_CV2_single_iter.R` | One iteration of CV2 (sparse testing). Called per trait per iteration. |
 | `BayesC_CV0.R` | CV0 for one trait (deterministic, incremental CSV saving) |
 | `BayesC_CrossLoc.R` | CrossLoc for one trait (deterministic, incremental CSV saving) |
-| `BayesC_CV0_CrossLoc.R` | Legacy combined CV0 + CrossLoc script (kept for reference) |
 | `launch_BayesC_jobs.sh` | Generates and optionally submits SLURM jobs. Supports iteration ranges and selective mode submission. |
 | `aggregate_BayesC_results.R` | Collects per-iteration CSVs into combined results, summary statistics, and combined predictions after jobs complete |
 
