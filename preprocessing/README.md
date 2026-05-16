@@ -1,7 +1,7 @@
 # Preprocessing
 
 Builds the marker, kinship, and phenotype inputs consumed by the genomic
-prediction models in `../models/`. The top-level `../README.md` gives the
+prediction models in `../models/`. The repository [README](../README.md) gives the
 project-wide context; this README documents the scripts in this directory.
 
 ## Pipeline
@@ -84,7 +84,7 @@ uniform.
 `BLUEs/` fits per-location BLUEs (one value per accession per location per
 trait) for use in phenotype-correlation plots and descriptive summaries.
 These BLUEs are **not** consumed by the genomic prediction models. See
-`BLUEs/README.md` for details.
+[BLUEs/README.md](BLUEs/README.md) for details.
 
 ## Usage
 
