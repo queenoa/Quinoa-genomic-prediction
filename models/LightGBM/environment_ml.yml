@@ -1,0 +1,15 @@
+name: null
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - lightgbm
+  - numpy
+  - pandas
+  - pytest
+  - python
+  - scikit-learn
+  - scipy
+
