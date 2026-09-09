@@ -304,7 +304,8 @@ See `models/LightGBM/environment_ml.yml`:
 
 ## Citation
 
-If you use this code or data, please cite: (Manuscript currently under review)
+If you use this code or data, please cite: 
+[Stanschewski, C. S., Warmington, M., Afzal, I., Rey, E., Fiene, G., Craine, E., ... & Poland, J. (2026). Genomic prediction in quinoa across contrasting environments using statistical and machine learning models. The Plant Genome, 19(3), e70277.](https://doi.org/10.1002/tpg2.70277)
 
 ## Contact
 
