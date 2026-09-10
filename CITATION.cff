@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this code or any part of it, please cite the manuscript."
+type: article
+authors:
+  - family-names: "Stanschewski"
+    given-names: "Clara S."
+  - family-names: "Warmington"
+    given-names: "Mark"
+  - family-names: "Afzal"
+    given-names: "Irfan"
+  - family-names: "Rey"
+    given-names: "Elodie"
+  - family-names: "Fiene"
+    given-names: "Gabriele"
+  - family-names: "Craine"
+    given-names: "Evan"
+  - family-names: "Murphy"
+    given-names: "Kevin"
+  - family-names: "Tester"
+    given-names: "Mark"
+  - family-names: "Poland"
+    given-names: "Jesse"
+title: "Genomic prediction in quinoa across contrasting environments using
+    statistical and machine learning models"
+journal: "The Plant Genome"
+year: 2026
+volume: 19
+issue: 3
+start: "e70277"
+doi: "10.1002/tpg2.70277"
